@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Mirror</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: white;
+            background: black;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+        #time, #date {
+            font-size: 64px;
+            margin: 0;
+        }
+        #weather, #news {
+            font-size: 32px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="date"></div>
+    <div id="time"></div>
+    <div id="weather"></div>
+    <div id="news"></div>
+
+    <script>
+        async function updateTimeDate() {
+            const response = await fetch('/time_date');
+            const data = await response.json();
+            document.getElementById('time').innerText = data.time;
+            document.getElementById('date').innerText = data.date;
+        }
+
+        async function updateWeather() {
+    try {
+        const response = await fetch('/weather');
+        const data = await response.json();
+        console.log('Weather Data:', data);
+
+        if (data.error) {
+            // Display error message if weather API fails
+            document.getElementById('weather').innerText = data.error;
+        } else if (data.main && data.weather) {
+            // Process and display valid weather data
+            const tempCelsius = data.main.temp;
+            const description = data.weather[0].description;
+            document.getElementById('weather').innerText = `${description}, ${tempCelsius}°C`;
+        } else {
+            throw new Error('Invalid weather data structure');
+        }
+    } catch (error) {
+        console.error('Error fetching weather data:', error);
+        document.getElementById('weather').innerText = 'Error fetching weather data';
+    }
+}
+
+
+            let newsIndex = 0;  // Track the current news index
+    let newsArticles = [];
+
+    async function updateNews() {
+        try {
+            const response = await fetch('/news');
+            const data = await response.json();
+            console.log('News Data:', data);
+
+            if (data.articles && data.articles.length > 0) {
+                newsArticles = data.articles;  // Store all news articles
+                displayNextNews();  // Start displaying news
+            } else {
+                document.getElementById('news').innerText = 'No news available';
+            }
+        } catch (error) {
+            console.error('Error fetching news data:', error);
+            document.getElementById('news').innerText = 'Error fetching news data';
+        }
+    }
+
+    function displayNextNews() {
+        if (newsArticles.length > 0) {
+            document.getElementById('news').innerText = newsArticles[newsIndex].title;
+            newsIndex = (newsIndex + 1) % newsArticles.length;  // Loop through articles
+        }
+    }
+
+        updateTimeDate();
+        updateWeather();
+        updateNews();
+
+        // Update time and date every minute
+        setInterval(displayNextNews, 9000);
+        setInterval(updateTimeDate, 1000);
+    </script>
+</body>
+</html>

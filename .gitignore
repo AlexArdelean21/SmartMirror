@@ -1,0 +1,11 @@
+# Ignore environment files
+.env
+
+# Ignore Python cache and compiled files
+__pycache__/
+*.pyc
+
+# Ignore virtual environments
+venv/
+
+Overview of the Project.txt
