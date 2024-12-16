@@ -8,7 +8,7 @@ load_dotenv()
 def get_news():
     try:
         api_key = os.getenv("NEWS_API_KEY")
-        country = "ro"  # Romania
+        country = "us"  # Romania
         news_url = f"https://gnews.io/api/v4/top-headlines?country={country}&token={api_key}"
         response = requests.get(news_url)
         response.raise_for_status()
