@@ -2,6 +2,29 @@ import os
 from dotenv import load_dotenv
 import requests
 from flask import jsonify
+import logging
+from logging.handlers import RotatingFileHandler
+
+
+# Configure logging
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
+import logging
+from logging.handlers import RotatingFileHandler
+
+# Configure log rotation
+log_handler = RotatingFileHandler(
+    'logs/error.log', maxBytes=5 * 1024 * 1024, backupCount=3  # 5MB per file, keep 3 backups
+)
+log_handler.setLevel(logging.ERROR)
+log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+log_handler.setFormatter(log_formatter)
+
+logger = logging.getLogger()
+logger.setLevel(logging.ERROR)
+logger.addHandler(log_handler)
+
 
 load_dotenv()
 
@@ -26,8 +49,8 @@ def get_weather():
         else:
             raise ValueError("Incomplete data in Weather API response")
 
-    except (requests.RequestException, ValueError) as e:
-        print(f"Error fetching weather data: {e}")
-        print("Weather API Response:", response.text)  # Log the raw response for debugging
-        return {"error": "Failed to fetch weather data"}, 500
 
+    except (requests.RequestException, ValueError) as e:
+        logging.error(f"Error fetching weather data: {e}")
+        logging.error(f"Weather API Response: {response.text if 'response' in locals() else 'No response'}")
+        return {"error": "Failed to fetch weather data"}, 500
