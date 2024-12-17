@@ -84,6 +84,20 @@ async function updateCrypto() {
     }
 }
 
+document.getElementById('voice-button').addEventListener('click', async () => {
+    try {
+        const response = await fetch('/voice_command');
+        const data = await response.json();
+        console.log('Voice Command:', data);
+
+        document.getElementById('voice-response').innerText = `Command: ${data.command}\nResponse: ${data.response}`;
+    } catch (error) {
+        console.error('Error triggering voice command:', error);
+        document.getElementById('voice-response').innerText = 'Error with the voice assistant';
+    }
+});
+
+
 // Initial Updates
 updateTimeDate();
 updateWeather();

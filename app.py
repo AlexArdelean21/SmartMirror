@@ -4,6 +4,8 @@ from services.datetime_service import get_time_date
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
 from flask_caching import Cache
+from services.voice_service import listen_command, speak_response
+
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})  # 5-minute cache
@@ -36,6 +38,24 @@ def crypto():
     if "error" in crypto_data:
         return jsonify(crypto_data), 500
     return jsonify(crypto_data)
+
+@app.route('/voice_command')
+def voice_command():
+    command = listen_command()
+    if "weather" in command:
+        weather_data = get_weather()
+        response = f"The current weather is {weather_data['weather'][0]['description']}, {weather_data['main']['temp']} degrees Celsius."
+    elif "news" in command:
+        news_data = get_news()
+        response = f"Here’s the top news headline: {news_data['articles'][0]['title']}"
+    elif "crypto" in command:
+        crypto_data = get_crypto_prices()
+        response = f"Bitcoin is {crypto_data['bitcoin']} dollars and Ethereum is {crypto_data['ethereum']} dollars."
+    else:
+        response = "Sorry, I did not understand the command."
+
+    speak_response(response)
+    return jsonify({"command": command, "response": response})
 
 
 @app.route('/refresh')
