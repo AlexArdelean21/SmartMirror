@@ -84,18 +84,25 @@ async function updateCrypto() {
     }
 }
 
-document.getElementById('voice-button').addEventListener('click', async () => {
-    try {
-        const response = await fetch('/voice_command');
-        const data = await response.json();
-        console.log('Voice Command:', data);
+document.getElementById("voice-button").addEventListener("click", function () {
+    fetch("/voice_command")
+        .then(response => response.json())
+        .then(data => {
+            console.log("Voice Command Response:", data);
 
-        document.getElementById('voice-response').innerText = `Command: ${data.command}\nResponse: ${data.response}`;
-    } catch (error) {
-        console.error('Error triggering voice command:', error);
-        document.getElementById('voice-response').innerText = 'Error with the voice assistant';
-    }
+            const responseDiv = document.getElementById("voice-response");
+            if (data.response) {
+                responseDiv.textContent = data.response;
+            } else {
+                responseDiv.textContent = "Sorry, I didn’t understand.";
+            }
+        })
+        .catch(error => {
+            console.error("Error fetching voice command:", error);
+            document.getElementById("voice-response").textContent = "Error processing voice command.";
+        });
 });
+
 
 
 // Initial Updates
