@@ -7,8 +7,9 @@ from pydub import AudioSegment
 from pydub.playback import play
 from tempfile import NamedTemporaryFile
 from openai import OpenAI
-import threading
 from dotenv import load_dotenv
+import random
+import time
 
 # Load environment variables
 load_dotenv()
@@ -17,8 +18,22 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CRE
 def initialize_google_tts_client():
     return texttospeech.TextToSpeechClient()
 
+FOLLOW_UP_ASK = [
+    "Anything else?",
+    "Would you like me to do something else?",
+    "Is there anything else I can help you with?",
+    "Do you need anything else?"
+]
+
+FOLLOW_UP_YES = [
+    "What's on your mind?",
+    "Go ahead, I'm listening.",
+    "What would you like to do next?",
+    "I'm here for you, what's next?"
+]
+
+
 def speak_response(response_text):
-    #Convert text to speech using Google Cloud TTS and play the response.
     client = initialize_google_tts_client()
 
     synthesis_input = texttospeech.SynthesisInput(text=response_text)
@@ -37,11 +52,16 @@ def speak_response(response_text):
         temp_audio.write(response.audio_content)
         temp_audio.close()
         audio = AudioSegment.from_file(temp_audio.name, format="mp3")
+
+        duration = len(audio) / 1000.0  # Duration in seconds
         play(audio)
         os.remove(temp_audio.name)
 
+    return duration
+
+
 def wake_word_detected():
-    """Detect wake word using Porcupine."""
+    #Detect wake word using Porcupine.
     access_key = os.getenv("PORCUPINE_ACCESS_KEY")
     custom_model_path = os.path.join(os.path.dirname(__file__), "../hey_adonis.ppn")
     porcupine = pvporcupine.create(access_key=access_key, keyword_paths=[custom_model_path])
@@ -62,7 +82,7 @@ def wake_word_detected():
 
 
 def listen_command():
-    """Listen for a voice command after wake word."""
+    #Listen for a voice command after wake word.
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         print("Listening for a command...")
@@ -78,7 +98,7 @@ def listen_command():
 
 
 def process_command(command):
-    """Process the voice command and provide a response."""
+    #Process the voice command and provide a response.
     from services.weather_service import get_weather
     from services.news_service import get_news
     from services.crypto_service import get_crypto_prices
@@ -95,25 +115,49 @@ def process_command(command):
     else:
         return chat_with_gpt(command)
 
+def random_phrase(phrases):
+    return random.choice(phrases)
+
+
 def wait_for_wake_and_command():
-    """Wait for wake word and process commands."""
-    if wake_word_detected():
-        response_text = "How can I assist you?"
-        print(response_text)
+    while True:
+        if wake_word_detected():
+            speak_response("How can I assist you?")
 
-        # Speak in a background thread
-        threading.Thread(target=speak_response, args=(response_text,)).start()
+            while True:
+                command = listen_command()
+                if not command or "no command" in command:
+                    speak_response("I didn't catch that. Please repeat.")
+                    continue
 
-        command = listen_command()
-        if command and "no command" not in command:
-            response = process_command(command)
-            print(f"Response: {response}")
+                if any(phrase in command for phrase in ["no", "that's all", "stop", "nothing"]):
+                    speak_response("Alright, see you later.")
+                    return
 
-            # Speak the response in a background thread
-            threading.Thread(target=speak_response, args=(response,)).start()
-            return response
-        return "Sorry, I didn't catch that."
-    return "Wake word not detected."
+                response = process_command(command)
+                speak_response(response)
+
+                while True:
+                    time.sleep(2)
+                    speak_response(random_phrase(FOLLOW_UP_ASK))
+
+                    follow_up_command = listen_command()
+                    if not follow_up_command or "no command" in follow_up_command:
+                        speak_response("I didn't understand that. Can you repeat?")
+                        continue
+
+                    if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]): # dosen't understand no
+                        speak_response("Alright, see you later.")
+                        return  # Exit back to wake word
+
+                    if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]): # dosen't understand thse yet
+                        speak_response(random_phrase(FOLLOW_UP_YES))
+                        break
+
+                    # If not recognized
+                    speak_response("I didn't understand that. Can you repeat?")
+
+
 
 def chat_with_gpt(prompt):
     #Interact with OpenAI's GPT model for general queries.
