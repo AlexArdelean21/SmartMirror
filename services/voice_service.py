@@ -1,24 +1,24 @@
 import os
+import pvporcupine
+from pvrecorder import PvRecorder
 import speech_recognition as sr
 from google.cloud import texttospeech
 from pydub import AudioSegment
 from pydub.playback import play
 from tempfile import NamedTemporaryFile
-from dotenv import load_dotenv
 from openai import OpenAI
-from openai import APIStatusError
-
+import threading
+from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 def initialize_google_tts_client():
-    """Initialize Google Cloud TTS Client."""
     return texttospeech.TextToSpeechClient()
 
 def speak_response(response_text):
-    """Convert text to speech using Google Cloud TTS and play the response."""
+    #Convert text to speech using Google Cloud TTS and play the response.
     client = initialize_google_tts_client()
 
     synthesis_input = texttospeech.SynthesisInput(text=response_text)
@@ -40,11 +40,30 @@ def speak_response(response_text):
         play(audio)
         os.remove(temp_audio.name)
 
-def listen_command():
-    """Listen for a voice command and return it as text."""
-    recognizer = sr.Recognizer()
-    speak_response("I'm listening")
+def wake_word_detected():
+    """Detect wake word using Porcupine."""
+    access_key = os.getenv("PORCUPINE_ACCESS_KEY")
+    custom_model_path = os.path.join(os.path.dirname(__file__), "../hey_adonis.ppn")
+    porcupine = pvporcupine.create(access_key=access_key, keyword_paths=[custom_model_path])
+    recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
+    print("Listening for wake word...")
 
+    try:
+        recorder.start()
+        while True:
+            pcm = recorder.read()
+            keyword_index = porcupine.process(pcm)
+            if keyword_index >= 0:
+                print("Wake word detected!")
+                return True
+    finally:
+        recorder.stop()
+        porcupine.delete()
+
+
+def listen_command():
+    """Listen for a voice command after wake word."""
+    recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         print("Listening for a command...")
         try:
@@ -52,33 +71,10 @@ def listen_command():
             command = recognizer.recognize_google(audio).lower()
             print(f"Recognized command: {command}")
             return command
-        except sr.WaitTimeoutError:
+        except (sr.WaitTimeoutError, sr.UnknownValueError):
             return "No command detected"
-        except sr.UnknownValueError:
-            return "Sorry, I did not understand that"
         except sr.RequestError:
             return "Error with the speech recognition service"
-
-from openai import APIStatusError
-
-def chat_with_gpt(prompt):
-    """Interact with OpenAI's GPT model for general queries."""
-    try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # 3 rpm
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    except APIStatusError as e:
-        if e.status_code == 429:
-            return "Sorry, I have reached my usage limit. Please try again later."
-        else:
-            return "An error occurred while processing your request."
-    except Exception as e:
-        print(f"Error: {e}")
-        return "Sorry, I couldn’t process that request."
-
 
 
 def process_command(command):
@@ -89,40 +85,61 @@ def process_command(command):
 
     if "weather" in command:
         weather_data = get_weather()
-        if "error" in weather_data:
-            return "Sorry, I couldn't fetch the weather information."
-        description = weather_data['weather'][0]['description']
-        temp = weather_data['main']['temp']
-        return f"The current weather is {description}, with a temperature of {temp} degrees Celsius."
-
+        return f"The current weather is {weather_data['weather'][0]['description']}, {weather_data['main']['temp']} degrees Celsius."
     elif "news" in command:
         news_data = get_news()
-        if "error" in news_data:
-            return "Sorry, I couldn't fetch the latest news."
-        headline = news_data['articles'][0]['title']
-        return f"Here's the latest news headline: {headline}"
-
-    elif "crypto" in command or "bitcoin" in command or "ethereum" in command:
+        return f"Here's the latest news headline: {news_data['articles'][0]['title']}."
+    elif "crypto" in command:
         crypto_data = get_crypto_prices()
-        if "error" in crypto_data:
-            return "Sorry, I couldn't fetch cryptocurrency prices."
-        bitcoin_price = crypto_data['bitcoin']
-        ethereum_price = crypto_data['ethereum']
-        return f"Bitcoin is currently priced at {bitcoin_price} dollars. Ethereum is at {ethereum_price} dollars."
-
+        return f"Bitcoin is ${crypto_data['bitcoin']}, Ethereum is ${crypto_data['ethereum']}."
     else:
-        # Use GPT for general queries
         return chat_with_gpt(command)
 
-def main():
-    """Run the voice assistant: listen for commands, process them, and speak the response."""
-    while True:
+def wait_for_wake_and_command():
+    """Wait for wake word and process commands."""
+    if wake_word_detected():
+        response_text = "How can I assist you?"
+        print(response_text)
+
+        # Speak in a background thread
+        threading.Thread(target=speak_response, args=(response_text,)).start()
+
         command = listen_command()
-        if command == "No command detected":
-            continue
-        response = process_command(command)
-        print(f"Response: {response}")
-        speak_response(response)
+        if command and "no command" not in command:
+            response = process_command(command)
+            print(f"Response: {response}")
+
+            # Speak the response in a background thread
+            threading.Thread(target=speak_response, args=(response,)).start()
+            return response
+        return "Sorry, I didn't catch that."
+    return "Wake word not detected."
+
+def chat_with_gpt(prompt):
+    #Interact with OpenAI's GPT model for general queries.
+    try:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error: {e}")
+        return "Sorry, I couldn’t process that request."
+
+def main():
+    #Run the continuous voice assistant.
+    while True:
+        # Wait for wake word
+        if wake_word_detected():
+            print("Wake word detected, playing 'How can I assist you?'")
+            speak_response("How can I assist you?")
+            command = listen_command()
+            if command and "no command" not in command:
+                response = process_command(command)
+                print(f"Response: {response}")
+                speak_response(response)
 
 if __name__ == "__main__":
     main()

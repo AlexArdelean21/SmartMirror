@@ -2,33 +2,7 @@
 <html>
 <head>
     <title>Smart Mirror</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            color: white;
-            background: black;
-            margin: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            text-align: center;
-        }
-        #time, #date {
-            font-size: 64px;
-            margin: 0;
-        }
-        #weather, #news {
-            font-size: 32px;
-            margin: 10px 0;
-        }
-        .error {
-        color: red;
-        font-weight: bold;
-    }
-    </style>
+    <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
     <div id="date"></div>
@@ -39,11 +13,8 @@
     </div>
     <div id="news"></div>
     <div id="crypto"></div>
-    <button id="voice-button" style="font-size: 24px; padding: 10px;">Activate Voice Command</button>
-    <div id="voice-response" style="margin-top: 20px; font-size: 24px;"></div>
-    <script src="static/script.js"></script>
+    <div id="voice-response"></div> <!-- Placeholder for voice assistant response -->
 
     <script src="static/script.js"></script>
-
 </body>
 </html>
