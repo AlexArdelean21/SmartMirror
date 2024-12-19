@@ -51,11 +51,39 @@ function pollVoiceResponse() {
         .catch(error => console.error('Error fetching voice response:', error));
 }
 
+// Update Calendar
+function updateCalendar() {
+    fetch('/calendar')
+        .then(response => response.json())
+        .then(data => {
+            const calendarDiv = document.getElementById('calendar');
+            if (data.error) {
+                calendarDiv.textContent = "Failed to load calendar events.";
+            } else if (data.message) {
+                calendarDiv.textContent = data.message;
+            } else if (data.length === 0) {
+                calendarDiv.textContent = "No upcoming events.";
+            } else {
+                calendarDiv.innerHTML = data.map(event =>
+                    `<div>${event.summary} - ${event.start.dateTime || event.start.date}</div>`
+                ).join('');
+            }
+        })
+        .catch(error => {
+            console.error("Error fetching calendar:", error);
+            document.getElementById('calendar').textContent = "Error loading calendar.";
+        });
+}
+
+
+// Schedule updates
 updateTimeAndDate();
 updateWeather();
 updateNews();
 updateCrypto();
+updateCalendar();
 
+setInterval(updateCalendar, 600000); // Refresh every 10 minutes
 setInterval(updateTimeAndDate, 1000); // Update time every second
 setInterval(updateWeather, 600000); // Update weather every 10 minutes
 setInterval(updateNews, 600000); // Update news every 10 minutes

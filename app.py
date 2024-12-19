@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, render_template, request
 
+from services.calendar_service import get_upcoming_events
 from services.voice_service import wait_for_wake_and_command
 from services.weather_service import get_weather
 from services.datetime_service import get_time_date
@@ -50,6 +51,17 @@ def voice_command():
 def refresh():
     cache.clear()
     return jsonify({"status": "Cache cleared", "message": "Data will refresh on next request."})
+
+@app.route('/calendar')
+def calendar():
+    events = get_upcoming_events()
+    if "error" in events:
+        return jsonify(events), 500
+    if len(events) == 0:
+        return jsonify({"message": "No upcoming events"}), 200
+    return jsonify(events)
+
+
 
 
 if __name__ == '__main__':
