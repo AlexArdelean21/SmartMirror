@@ -57,13 +57,16 @@ function updateCalendar() {
         .then(response => response.json())
         .then(data => {
             const calendarDiv = document.getElementById('calendar');
+            console.log("Calendar Data:", data); // Debugging
+
             if (data.error) {
                 calendarDiv.textContent = "Failed to load calendar events.";
-            } else if (data.message) {
+            } else if (data.message) { // Handle "No upcoming events"
                 calendarDiv.textContent = data.message;
             } else if (data.length === 0) {
                 calendarDiv.textContent = "No upcoming events.";
             } else {
+                // Render events
                 calendarDiv.innerHTML = data.map(event =>
                     `<div>${event.summary} - ${event.start.dateTime || event.start.date}</div>`
                 ).join('');

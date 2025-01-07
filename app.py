@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, render_template, request
 
-from services.calendar_service import get_upcoming_events
+from services.calendar_service import get_upcoming_events, add_event
 from services.voice_service import wait_for_wake_and_command
 from services.weather_service import get_weather
 from services.datetime_service import get_time_date
@@ -62,6 +62,19 @@ def calendar():
     return jsonify(events)
 
 
+@app.route('/add_event', methods=['POST'])
+def add_event():
+    data = request.json
+    summary = data.get('summary')
+    start_time = data.get('start_time')
+    end_time = data.get('end_time')
+    description = data.get('description')
+
+    if not all([summary, start_time, end_time]):
+        return jsonify({"error": "Missing required event details"}), 400
+
+    result = add_event(summary, start_time, end_time, description)
+    return jsonify(result)
 
 
 if __name__ == '__main__':

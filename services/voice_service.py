@@ -1,4 +1,7 @@
-import os
+from services.calendar_service import add_event
+from services.weather_service import get_weather
+from services.news_service import get_news
+from services.crypto_service import get_crypto_prices
 import pvporcupine
 from pvrecorder import PvRecorder
 import speech_recognition as sr
@@ -8,8 +11,13 @@ from pydub.playback import play
 from tempfile import NamedTemporaryFile
 from openai import OpenAI
 from dotenv import load_dotenv
+import logging
 import random
 import time
+import os
+import re
+from datetime import datetime, timedelta
+
 
 # Load environment variables
 load_dotenv()
@@ -32,32 +40,40 @@ FOLLOW_UP_YES = [
     "I'm here for you, what's next?"
 ]
 
-
 def speak_response(response_text):
-    client = initialize_google_tts_client()
+    try:
+        client = initialize_google_tts_client()
 
-    synthesis_input = texttospeech.SynthesisInput(text=response_text)
-    voice = texttospeech.VoiceSelectionParams(
-        language_code="en-US",
-        name="en-US-Wavenet-F",
-        ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
-    )
-    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+        synthesis_input = texttospeech.SynthesisInput(text=response_text)
+        voice = texttospeech.VoiceSelectionParams(
+            language_code="en-US",
+            name="en-US-Wavenet-F",
+            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+        )
+        audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
 
-    response = client.synthesize_speech(
-        input=synthesis_input, voice=voice, audio_config=audio_config
-    )
+        response = client.synthesize_speech(
+            input=synthesis_input, voice=voice, audio_config=audio_config
+        )
 
-    with NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
-        temp_audio.write(response.audio_content)
-        temp_audio.close()
-        audio = AudioSegment.from_file(temp_audio.name, format="mp3")
+        with NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
+            temp_audio.write(response.audio_content)
+            temp_audio.close()
+            audio = AudioSegment.from_file(temp_audio.name, format="mp3")
 
-        duration = len(audio) / 1000.0  # Duration in seconds
-        play(audio)
-        os.remove(temp_audio.name)
+            duration = len(audio) / 1000.0  # Duration in seconds
+            try:
+                play(audio)
+            except OSError as e:
+                logging.error(f"Audio playback failed: {e}")
+            finally:
+                os.remove(temp_audio.name)
 
-    return duration
+        return duration
+    except Exception as e:
+        logging.error(f"Error in TTS response: {e}")
+
+
 
 
 def wake_word_detected():
@@ -98,22 +114,101 @@ def listen_command():
 
 
 def process_command(command):
-    #Process the voice command and provide a response.
-    from services.weather_service import get_weather
-    from services.news_service import get_news
-    from services.crypto_service import get_crypto_prices
+    # Check for event creation command
+    if "add an event" in command.lower():
+        event_data = handle_command(command)
+        if not event_data:
+            return "I couldn't understand the event details. Please try again."
 
-    if "weather" in command:
+        # Call add_event with parsed data
+        try:
+            result = add_event(
+                summary=event_data["summary"],
+                start_time=event_data["start_time"],
+                end_time=event_data["end_time"]
+            )
+            if result.get("status") == "success":
+                return f"Event '{event_data['summary']}' added successfully."
+            else:
+                return "Failed to add the event. Please try again."
+        except Exception as e:
+            logging.error(f"Error adding event: {e}")
+            return "An error occurred while adding the event."
+
+    # Handle weather command
+    elif "weather" in command:
         weather_data = get_weather()
         return f"The current weather is {weather_data['weather'][0]['description']}, {weather_data['main']['temp']} degrees Celsius."
+
+    # Handle news command
     elif "news" in command:
         news_data = get_news()
         return f"Here's the latest news headline: {news_data['articles'][0]['title']}."
+
+    # Handle cryptocurrency prices command
     elif "crypto" in command:
         crypto_data = get_crypto_prices()
         return f"Bitcoin is ${crypto_data['bitcoin']}, Ethereum is ${crypto_data['ethereum']}."
+
+    # Default fallback to chat with GPT
     else:
         return chat_with_gpt(command)
+
+def handle_command(command):
+    try:
+        # Parse the title, excluding phrases like "event called" or "called"
+        title_match = re.search(r"(?:add an event|create an event|an event called|event called|called) ['\"]?(.+?)['\"]?(?: today| tomorrow| on \w+day| at .*)?$", command, re.IGNORECASE)
+        if title_match:
+            title = title_match.group(1).strip()
+        else:
+            raise ValueError("Event title not found in command.")
+
+        # Parse date and time
+        time_match = re.search(r"(today|tomorrow|on \w+day) at (\d+)(:\d+)? ?(AM|PM)?", command, re.IGNORECASE)
+        if not time_match:
+            raise ValueError("Date and time not found in command.")
+
+        day, hour, minutes, meridian = time_match.groups()
+        now = datetime.now()
+
+        # Determine event date
+        if "tomorrow" in day.lower():
+            event_date = now + timedelta(days=1)
+        elif "today" in day.lower():
+            event_date = now
+        else:
+            raise ValueError("Only 'today' and 'tomorrow' are supported.")
+
+        # Clean and convert minutes
+        minutes = minutes[1:] if minutes else "0"
+        hour = int(hour)
+        minutes = int(minutes)
+
+        # Validate and adjust AM/PM
+        if meridian:
+            if meridian.upper() == "PM" and hour != 12:
+                hour += 12
+            elif meridian.upper() == "AM" and hour == 12:
+                hour = 0
+        else:
+            # Default to PM if meridian is missing and hour is in a reasonable range
+            if hour < 9:
+                hour += 12
+
+        # Format start and end times
+        start_time = event_date.replace(hour=hour, minute=minutes, second=0).isoformat()
+        end_time = (event_date + timedelta(hours=1)).replace(hour=hour, minute=minutes, second=0).isoformat()
+
+        return {
+            "summary": title,
+            "start_time": start_time,
+            "end_time": end_time
+        }
+    except ValueError as ve:
+        logging.error(f"Error parsing command: {ve}")
+        return None
+
+
 
 def random_phrase(phrases):
     return random.choice(phrases)
