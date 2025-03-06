@@ -2,6 +2,7 @@ from services.calendar_service import add_event
 from services.weather_service import get_weather
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
+from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally
 import pvporcupine
 from pvrecorder import PvRecorder
 import speech_recognition as sr
@@ -150,6 +151,12 @@ def process_command(command):
         crypto_data = get_crypto_prices()
         return f"Bitcoin is ${crypto_data['bitcoin']}, Ethereum is ${crypto_data['ethereum']}."
 
+    elif "start facial recognition" in command:
+        return recognize_faces_vocally()
+
+    elif "add my face" in command:
+        return add_face_vocally()
+
     # Default fallback to chat with GPT
     else:
         return chat_with_gpt(command)
@@ -217,7 +224,26 @@ def random_phrase(phrases):
 def wait_for_wake_and_command():
     while True:
         if wake_word_detected():
-            speak_response("How can I assist you?")
+            user_name = recognize_faces_vocally()
+
+        if user_name == "Unknown":
+            speak_response("I don't recognize you. Would you like to register?")
+            user_response = listen_command()
+
+            if any(word in user_response.lower() for word in ["yes", "sure", "okay", "yeah"]):
+                speak_response("Please state your name clearly.")
+                user_name = listen_command()
+                if user_name:
+                    speak_response(f"Registering {user_name}. Please look at the camera.")
+                    add_face_vocally(user_name)
+                    speak_response(f"Face registered successfully. Hello {user_name}! How can i assist you?")
+                else:
+                    speak_response("I didn't catch your name. Please try again later.")
+            else:
+                speak_response("Unknown user - limited access.")
+        else:
+            speak_response(f"How can i assist you")
+
 
             while True:
                 command = listen_command()

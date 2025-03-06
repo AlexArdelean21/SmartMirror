@@ -7,6 +7,7 @@ from services.datetime_service import get_time_date
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
 from flask_caching import Cache
+from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally
 
 
 app = Flask(__name__)
@@ -75,6 +76,19 @@ def add_event():
 
     result = add_event(summary, start_time, end_time, description)
     return jsonify(result)
+
+@app.route('/add_face', methods=['POST'])
+def add_face_route():
+    data = request.json
+    name = data.get("name")
+    image_path = data.get("image_path")
+    result = add_face(name, image_path)
+    return jsonify(result)
+
+@app.route('/recognize_faces', methods=['GET'])
+def recognize_faces_route():
+    recognize_faces()
+    return jsonify({"status": "success", "message": "Recognition session completed"})
 
 
 if __name__ == '__main__':
