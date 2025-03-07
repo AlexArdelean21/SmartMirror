@@ -39,16 +39,70 @@ function updateCrypto() {
         });
 }
 
-// Poll Voice Responses
+// Poll Voice Responses and Update UI
 function pollVoiceResponse() {
     fetch('/voice_command')
         .then(response => response.json())
         .then(data => {
-            if (data.response) {
-                document.getElementById('voice-response').textContent = `Assistant: ${data.response}`;
+            if (data.response_audio) {
+                playSpeechAudio(data.response_audio);
+                document.getElementById('voice-response').textContent = data.text;
             }
         })
         .catch(error => console.error('Error fetching voice response:', error));
+}
+
+
+// Voice Animation Using Web Audio API
+const canvas = document.getElementById("voice-visualizer");
+const ctx = canvas.getContext("2d");
+canvas.width = 300;
+canvas.height = 100;
+
+let audioContext, analyzer, source, dataArray, bufferLength;
+
+function startVoiceVisualizer(audioElement) {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyzer = audioContext.createAnalyser();
+        analyzer.fftSize = 64; // Adjust for smoothness
+        bufferLength = analyzer.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+    }
+
+    source = audioContext.createMediaElementSource(audioElement);
+    source.connect(analyzer);
+    analyzer.connect(audioContext.destination);
+
+    drawVisualizer();
+}
+
+// Animate the Voice Response Based on Audio Frequency
+function drawVisualizer() {
+    requestAnimationFrame(drawVisualizer);
+    analyzer.getByteFrequencyData(dataArray);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const barWidth = (canvas.width / bufferLength) * 1.5;
+    let x = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+        const barHeight = dataArray[i] / 2;
+        ctx.fillStyle = `rgb(${barHeight + 100}, ${50 + i * 3}, 200)`;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 2;
+    }
+}
+
+// Play Speech Audio and Start Animation
+function playSpeechAudio(audioSrc) {
+    const audio = new Audio(audioSrc);
+    audio.play();
+    startVoiceVisualizer(audio);
+
+    audio.onended = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear visualizer when done
+    };
 }
 
 // Update Calendar
@@ -76,6 +130,21 @@ function updateCalendar() {
             console.error("Error fetching calendar:", error);
             document.getElementById('calendar').textContent = "Error loading calendar.";
         });
+}
+
+// Play Speech Audio and Start Animation
+function playSpeechAudio(audioSrc) {
+    const audio = new Audio(audioSrc);
+    audio.play();
+    startVoiceVisualizer(audio);
+
+    // Show speaking animation
+    document.getElementById('voice-response').textContent = "Smart Mirror is speaking...";
+
+    audio.onended = () => {
+        document.getElementById('voice-response').textContent = "Waiting for command...";
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear visualizer when done
+    };
 }
 
 

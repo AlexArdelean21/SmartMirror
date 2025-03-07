@@ -45,8 +45,10 @@ def crypto():
 @app.route('/voice_command')
 def voice_command():
     response = wait_for_wake_and_command()
-    print(f"Voice Command Response: {response}")
-    return jsonify({"response": response})
+    if isinstance(response, dict) and "audio_url" in response:
+        return jsonify(response)  # Now includes text + audio
+    return jsonify({"text": "No response", "audio_url": None})
+
 
 @app.route('/refresh')
 def refresh():
@@ -82,12 +84,12 @@ def add_face_route():
     data = request.json
     name = data.get("name")
     image_path = data.get("image_path")
-    result = add_face(name, image_path)
+    result = add_face_vocally(name, image_path)
     return jsonify(result)
 
 @app.route('/recognize_faces', methods=['GET'])
 def recognize_faces_route():
-    recognize_faces()
+    recognize_faces_vocally()
     return jsonify({"status": "success", "message": "Recognition session completed"})
 
 

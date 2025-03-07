@@ -26,3 +26,11 @@ body {
     color: red;
     font-weight: bold;
 }
+
+#voice-visualizer {
+    width: 300px;
+    height: 100px;
+    display: block;
+    background: transparent;
+}
+

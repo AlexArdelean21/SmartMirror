@@ -44,7 +44,6 @@ FOLLOW_UP_YES = [
 def speak_response(response_text):
     try:
         client = initialize_google_tts_client()
-
         synthesis_input = texttospeech.SynthesisInput(text=response_text)
         voice = texttospeech.VoiceSelectionParams(
             language_code="en-US",
@@ -57,6 +56,12 @@ def speak_response(response_text):
             input=synthesis_input, voice=voice, audio_config=audio_config
         )
 
+        # Save audio for web playback
+        audio_file_path = "static/audio_response.mp3"
+        with open(audio_file_path, "wb") as out:
+            out.write(response.audio_content)
+
+        # Play the audio response
         with NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
             temp_audio.write(response.audio_content)
             temp_audio.close()
@@ -70,11 +75,11 @@ def speak_response(response_text):
             finally:
                 os.remove(temp_audio.name)
 
-        return duration
+        return {"text": response_text, "duration": duration, "audio_url": f"/{audio_file_path}"}
+
     except Exception as e:
         logging.error(f"Error in TTS response: {e}")
-
-
+        return {"text": "", "duration": 0, "audio_url": ""}
 
 
 def wake_word_detected():
@@ -226,57 +231,69 @@ def wait_for_wake_and_command():
         if wake_word_detected():
             user_name = recognize_faces_vocally()
 
-        if user_name == "Unknown":
-            speak_response("I don't recognize you. Would you like to register?")
-            user_response = listen_command()
+        while True:
+            if user_name == "ghost":
+                speak_response("Maybe I'm hearin things!")
+                break
 
-            if any(word in user_response.lower() for word in ["yes", "sure", "okay", "yeah"]):
-                speak_response("Please state your name clearly.")
-                user_name = listen_command()
-                if user_name:
-                    speak_response(f"Registering {user_name}. Please look at the camera.")
-                    add_face_vocally(user_name)
-                    speak_response(f"Face registered successfully. Hello {user_name}! How can i assist you?")
+            if user_name == "Unknown":
+                speak_response("I don't recognize you. Would you like to register?")
+                user_response = listen_command()
+
+                if any(word in user_response.lower() for word in ["yes", "sure", "okay", "yeah"]):
+                    speak_response("Please state your name clearly.")
+                    user_name = listen_command()
+                    if user_name:
+                        speak_response(f"Registering {user_name}. Please look at the camera.")
+                        add_face_vocally(user_name)
+                        speak_response(f"Face registered successfully. Hello {user_name}! How can i assist you?")
+                        break
+                    else:
+                        speak_response("I didn't catch your name. Please try again.")
                 else:
-                    speak_response("I didn't catch your name. Please try again later.")
+                    speak_response("Unknown user - limited access.")
+                    break
             else:
-                speak_response("Unknown user - limited access.")
-        else:
-            speak_response(f"How can i assist you")
+                speak_response(f"How can i assist you")
+                break
 
+
+        while True:
+            if user_name == "ghost":
+                break
+
+            command = listen_command()
+            if not command or "no command" in command:
+                speak_response("I didn't catch that. Please repeat.")
+                continue
+
+            if any(phrase in command for phrase in ["no", "that's all", "stop", "nothing"]):
+                speak_response("Alright, see you later.")
+                return
+
+            response = process_command(command)
+            speak_response(response)
 
             while True:
-                command = listen_command()
-                if not command or "no command" in command:
-                    speak_response("I didn't catch that. Please repeat.")
+                time.sleep(2)
+                speak_response(random_phrase(FOLLOW_UP_ASK))
+
+                follow_up_command = listen_command()
+                if not follow_up_command or "no command" in follow_up_command:
+                    speak_response("I didn't understand that. Can you repeat?")
                     continue
 
-                if any(phrase in command for phrase in ["no", "that's all", "stop", "nothing"]):
+                if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]): # dosen't understand no
                     speak_response("Alright, see you later.")
-                    return
+                    return  # Exit back to wake word
 
-                response = process_command(command)
-                speak_response(response)
+                # dosen't understand thse yet( it dose if you say more words like "yes please")
+                if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]):
+                    speak_response(random_phrase(FOLLOW_UP_YES))
+                    break
 
-                while True:
-                    time.sleep(2)
-                    speak_response(random_phrase(FOLLOW_UP_ASK))
-
-                    follow_up_command = listen_command()
-                    if not follow_up_command or "no command" in follow_up_command:
-                        speak_response("I didn't understand that. Can you repeat?")
-                        continue
-
-                    if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]): # dosen't understand no
-                        speak_response("Alright, see you later.")
-                        return  # Exit back to wake word
-
-                    if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]): # dosen't understand thse yet
-                        speak_response(random_phrase(FOLLOW_UP_YES))
-                        break
-
-                    # If not recognized
-                    speak_response("I didn't understand that. Can you repeat?")
+                # If not recognized
+                speak_response("I didn't understand that. Can you repeat?")
 
 
 

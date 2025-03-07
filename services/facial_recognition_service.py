@@ -1,7 +1,7 @@
 import cv2
 import face_recognition
 import pickle
-
+import time
 # Load or save known faces
 def load_known_faces():
     try:
@@ -20,9 +20,11 @@ def recognize_faces_vocally():
     known_faces = load_known_faces()
     known_encodings = list(known_faces.values())
     known_names = list(known_faces.keys())
+    start_time = time.time()
+    wating_time = 15 # looks for a face for 20s
 
     video_capture = cv2.VideoCapture(0)
-    speak_response("Looking for faces...")
+    speak_response("Let's see who it is...")
 
     while True:
         ret, frame = video_capture.read()
@@ -33,8 +35,10 @@ def recognize_faces_vocally():
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         face_locations = face_recognition.face_locations(rgb_frame)
 
-        # Ensure at least one face is detected
         if not face_locations:
+            if time.time() - start_time > wating_time:
+                speak_response("Couldn't find a face!")
+                return "ghost"
             continue  # Skip processing if no faces are found
 
         face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
@@ -56,7 +60,7 @@ def recognize_faces_vocally():
 
         speak_response("I don't recognize you. Would you like to register?")
         video_capture.release()
-        return "Unknown"
+        return name
 
 
 def add_face_vocally(name=None):
@@ -67,8 +71,8 @@ def add_face_vocally(name=None):
         speak_response("Please state your name.")
         name = listen_command()
 
-    if not name or name.lower() in ["unknown", "secret"]:
-        return "I didn't catch that. Please try again."
+    if name or name.lower() in known_faces:
+        return f"You are already registered, {name}."
 
     video_capture = cv2.VideoCapture(0)
     speak_response(f"Looking for your face, {name}. Please stay still.")
@@ -94,7 +98,7 @@ def add_face_vocally(name=None):
 
         known_faces[name] = face_encodings[0]
         save_known_faces(known_faces)
-        speak_response(f"Face added successfully for {name}.")
+        # speak_response(f"Face added successfully for {name}.")
         break
 
     video_capture.release()
