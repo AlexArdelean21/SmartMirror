@@ -46,7 +46,7 @@ function updateNews() {
     fetch('/news')
         .then(response => response.json())
         .then(data => {
-            let newsElement = document.getElementById('news');
+            let newsElement = document.getElementById('news-content');
 
             if (newsElement.textContent !== `News: ${data.articles[0].title}`) {
                 newsElement.textContent = `News: ${data.articles[0].title}`;
@@ -62,7 +62,7 @@ function updateCrypto() {
     fetch('/crypto')
         .then(response => response.json())
         .then(data => {
-            let cryptoElement = document.getElementById('crypto');
+            let cryptoElement = document.getElementById('crypto-content');
 
             let newCryptoText = `Bitcoin: $${data.bitcoin}, Ethereum: $${data.ethereum}`;
             if (cryptoElement.textContent !== newCryptoText) {
@@ -81,7 +81,7 @@ function pollVoiceResponse() {
         .then(data => {
             if (data.response_audio) {
                 playSpeechAudio(data.response_audio);
-                document.getElementById('voice-response').textContent = data.text;
+                document.getElementById('voice-text').textContent = data.text;
             }
         })
         .catch(error => console.error('Error fetching voice response:', error));
@@ -145,7 +145,7 @@ function updateCalendar() {
     fetch('/calendar')
         .then(response => response.json())
         .then(data => {
-            let calendarDiv = document.getElementById('calendar');
+            let calendarDiv = document.getElementById('calendar-content');
 
             if (data.error) {
                 calendarDiv.textContent = "Failed to load calendar events.";
@@ -196,8 +196,8 @@ updateCrypto();
 updateCalendar();
 
 setInterval(updateCalendar, 600000); // Refresh every 10 minutes
-setInterval(updateTimeAndDate, 1000); // Update time every second
-setInterval(updateWeather, 600000); // Update weather every 10 minutes
-setInterval(updateNews, 600000); // Update news every 10 minutes
+setInterval(updateTimeAndDate, 1000); // Update time every 5 second
+setInterval(updateWeather, 300000); // Update weather every 5 minutes
+setInterval(updateNews, 60000); // Update news every 10 minutes
 setInterval(updateCrypto, 300000); // Update crypto prices every 5 minutes
 setInterval(pollVoiceResponse, 15000); // Poll voice assistant every 15 seconds

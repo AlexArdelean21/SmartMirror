@@ -3,28 +3,45 @@
 <head>
     <title>Smart Mirror</title>
     <link rel="stylesheet" href="static/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
+
 <body>
-    <div class="container">
-        <div id="time-widget" class="widget">
-            <div id="time"></div>
-            <div id="date"></div>
-        </div>
-
-        <div id="weather" class="widget">
-            <img id="weather-icon" style="vertical-align: middle;" />
-            <span id="weather-description"></span>
-        </div>
-
-        <div id="news" class="widget"></div>
-        <div id="crypto" class="widget"></div>
-
-        <div id="calendar" class="widget"></div>
-        <div id="voice-response" class="widget"></div>
+<div class="container">
+    <div id="time-widget" class="widget">
+<!--        <i class="fas fa-clock"></i> &lt;!&ndash; Time Icon &ndash;&gt;-->
+        <div id="time"></div>
+        <div id="date"></div>
     </div>
 
-    <canvas id="voice-visualizer"></canvas>
+    <div id="weather" class="widget">
+<!--        <i class="fas fa-cloud-sun"></i> &lt;!&ndash; Weather Icon &ndash;&gt;-->
+        <img id="weather-icon" style="vertical-align: middle;" />
+        <span id="weather-description"></span>
+    </div>
 
+    <div id="news" class="widget">
+        <i class="fas fa-newspaper"></i> <!-- News Icon -->
+        <span id="news-content"></span>
+    </div>
+
+    <div id="crypto" class="widget">
+        <i class="fab fa-bitcoin"></i> <!-- Crypto Icon -->
+        <span id="crypto-content"></span>
+    </div>
+
+    <div id="calendar" class="widget">
+        <i class="fas fa-calendar-alt"></i> <!-- Calendar Icon -->
+        <span id="calendar-content"></span>
+    </div>
+
+    <div id="voice-response" class="widget">
+        <i class="fas fa-microphone"></i> <!-- Voice Icon -->
+        <span id="voice-text"></span>
+    </div>
+</div>
+
+    <canvas id="voice-visualizer"></canvas>
     <script src="static/script.js"></script>
 </body>
 

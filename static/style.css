@@ -134,3 +134,14 @@ body {
         grid-column: span 1;
     }
 }
+
+.widget i {
+    font-size: 32px;
+    margin-bottom: 5px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.widget span {
+    font-size: 24px;
+    margin-top: 5px;
+}
