@@ -21,7 +21,7 @@ def recognize_faces_vocally():
     known_encodings = list(known_faces.values())
     known_names = list(known_faces.keys())
     start_time = time.time()
-    wating_time = 15 # looks for a face for 20s
+    wating_time = 120 # looks for a face for 20s
 
     video_capture = cv2.VideoCapture(0)
     speak_response("Let's see who it is...")
@@ -58,8 +58,8 @@ def recognize_faces_vocally():
                 video_capture.release()
                 return name
 
-        speak_response("I don't recognize you. Would you like to register?")
         video_capture.release()
+        # return Unknown user
         return name
 
 

@@ -1,21 +1,24 @@
-<!DOCTYPE html>
+<!DOCTYPE html>z`
 <html>
 <head>
     <title>Smart Mirror</title>
     <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
-    <div id="date"></div>
+<div id="time-widget" class="widget">
     <div id="time"></div>
-    <div id="weather">
-        <img id="weather-icon" style="vertical-align: middle;" />
-        <span id="weather-description"></span>
-    </div>
-    <div id="news"></div>
-    <div id="crypto"></div>
-    <div id="calendar"></div>
-    <div id="voice-response">Waiting for command...</div>
-    <canvas id="voice-visualizer"></canvas>
+    <div id="date"></div>
+</div>
+<div id="weather" class="widget">
+    <img id="weather-icon" style="vertical-align: middle;" />
+    <span id="weather-description"></span>
+</div>
+<div id="news" class="widget"></div>
+<div id="crypto" class="widget"></div>
+<div id="calendar" class="widget"></div>
+<div id="voice-response" class="widget"></div>
+
+<canvas id="voice-visualizer"></canvas>
 
     <script src="static/script.js"></script>
 </body>

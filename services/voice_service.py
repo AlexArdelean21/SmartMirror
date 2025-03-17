@@ -2,7 +2,7 @@ from services.calendar_service import add_event
 from services.weather_service import get_weather
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
-from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally
+from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally, load_known_faces
 import pvporcupine
 from pvrecorder import PvRecorder
 import speech_recognition as sr
@@ -232,6 +232,7 @@ def wait_for_wake_and_command():
             user_name = recognize_faces_vocally()
 
         while True:
+            known_faces = load_known_faces()
             if user_name == "ghost":
                 speak_response("Maybe I'm hearin things!")
                 break
@@ -243,6 +244,11 @@ def wait_for_wake_and_command():
                 if any(word in user_response.lower() for word in ["yes", "sure", "okay", "yeah"]):
                     speak_response("Please state your name clearly.")
                     user_name = listen_command()
+
+                    if user_name or user_name.lower() in known_faces:
+                        speak_response(f"This username is taken, try another one.")
+                        continue # ???????
+
                     if user_name:
                         speak_response(f"Registering {user_name}. Please look at the camera.")
                         add_face_vocally(user_name)
