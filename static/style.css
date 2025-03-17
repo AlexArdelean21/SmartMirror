@@ -13,6 +13,28 @@ body {
     text-align: center;
 }
 
+/* Smart Mirror Grid Layout */
+.container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Two-column layout */
+    grid-template-rows: auto;
+    gap: 20px;
+    width: 90%;
+    max-width: 1200px;
+    margin: auto;
+}
+
+#time-widget {
+    grid-column: span 2;
+    text-align: center;
+}
+
+#calendar {
+    grid-column: auto;
+    text-align: center;
+}
+
+/* Frosted glass effect for widgets */
 .widget {
     background: rgba(255, 255, 255, 0.1);  /* Transparent white */
     border-radius: 15px;
@@ -20,9 +42,13 @@ body {
     backdrop-filter: blur(10px); /* Frosted glass effect */
     -webkit-backdrop-filter: blur(10px); /* Safari support */
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    margin: 10px 0;
-    width: 80%;
-    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 1s ease-out forwards;
 }
 
 /* Time and Date Widget */
@@ -45,6 +71,11 @@ body {
     opacity: 0.8;
 }
 
+#voice-response {
+    grid-column: span 2;
+    text-align: center;
+}
+
 #weather, #news, #crypto, #voice-response, #calendar {
     font-size: 32px;
     margin: 10px 0;
@@ -59,4 +90,47 @@ body {
 
 #weather img {
     filter: drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.7)); /* Slight glow */
+}
+
+.widget-update {
+    animation: scaleUp 0.3s ease-in-out;
+}
+
+/* Glow effect on hover */
+.widget:hover {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes scaleUp {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 800px) {
+    .container {
+        grid-template-columns: 1fr; /* Switch to single column on small screens */
+    }
+
+    #time-widget, #calendar {
+        grid-column: span 1;
+    }
 }

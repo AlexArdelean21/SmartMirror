@@ -3,41 +3,76 @@ function updateTimeAndDate() {
     fetch('/time_date')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('time').textContent = data.time;
-            document.getElementById('date').textContent = data.date;
+            let timeElement = document.getElementById('time');
+            let dateElement = document.getElementById('date');
+
+            // Check if content is actually changing
+            if (timeElement.textContent !== data.time) {
+                timeElement.textContent = data.time;
+                timeElement.classList.add('widget-update');
+                setTimeout(() => timeElement.classList.remove('widget-update'), 300);
+            }
+
+            if (dateElement.textContent !== data.date) {
+                dateElement.textContent = data.date;
+                dateElement.classList.add('widget-update');
+                setTimeout(() => dateElement.classList.remove('widget-update'), 300);
+            }
         });
 }
+
 
 // Update Weather
 function updateWeather() {
     fetch('/weather')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('weather-description').textContent =
-                `${data.weather[0].description}, ${data.main.temp}°C`;
-            document.getElementById('weather-icon').src = data.weather[0].icon;
+            let weatherDesc = document.getElementById('weather-description');
+            let weatherIcon = document.getElementById('weather-icon');
+
+            if (weatherDesc.textContent !== `${data.weather[0].description}, ${data.main.temp}°C`) {
+                weatherDesc.textContent = `${data.weather[0].description}, ${data.main.temp}°C`;
+                weatherDesc.classList.add('widget-update');
+                setTimeout(() => weatherDesc.classList.remove('widget-update'), 300);
+            }
+
+            weatherIcon.src = data.weather[0].icon;
         });
 }
+
 
 // Update News
 function updateNews() {
     fetch('/news')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('news').textContent =
-                `News: ${data.articles[0].title}`;
+            let newsElement = document.getElementById('news');
+
+            if (newsElement.textContent !== `News: ${data.articles[0].title}`) {
+                newsElement.textContent = `News: ${data.articles[0].title}`;
+                newsElement.classList.add('widget-update');
+                setTimeout(() => newsElement.classList.remove('widget-update'), 300);
+            }
         });
 }
+
 
 // Update Crypto Prices
 function updateCrypto() {
     fetch('/crypto')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('crypto').textContent =
-                `Bitcoin: $${data.bitcoin}, Ethereum: $${data.ethereum}`;
+            let cryptoElement = document.getElementById('crypto');
+
+            let newCryptoText = `Bitcoin: $${data.bitcoin}, Ethereum: $${data.ethereum}`;
+            if (cryptoElement.textContent !== newCryptoText) {
+                cryptoElement.textContent = newCryptoText;
+                cryptoElement.classList.add('widget-update');
+                setTimeout(() => cryptoElement.classList.remove('widget-update'), 300);
+            }
         });
 }
+
 
 // Poll Voice Responses and Update UI
 function pollVoiceResponse() {
@@ -110,20 +145,24 @@ function updateCalendar() {
     fetch('/calendar')
         .then(response => response.json())
         .then(data => {
-            const calendarDiv = document.getElementById('calendar');
-            console.log("Calendar Data:", data); // Debugging
+            let calendarDiv = document.getElementById('calendar');
 
             if (data.error) {
                 calendarDiv.textContent = "Failed to load calendar events.";
-            } else if (data.message) { // Handle "No upcoming events"
+            } else if (data.message) {
                 calendarDiv.textContent = data.message;
             } else if (data.length === 0) {
                 calendarDiv.textContent = "No upcoming events.";
             } else {
-                // Render events
-                calendarDiv.innerHTML = data.map(event =>
-                    `<div>${event.summary} - ${event.start.dateTime || event.start.date}</div>`
+                let newCalendarHTML = data.map(event =>
+                    `<div class="calendar-event">${event.summary} - ${event.start.dateTime || event.start.date}</div>`
                 ).join('');
+
+                if (calendarDiv.innerHTML !== newCalendarHTML) {
+                    calendarDiv.innerHTML = newCalendarHTML;
+                    calendarDiv.classList.add('widget-update');
+                    setTimeout(() => calendarDiv.classList.remove('widget-update'), 300);
+                }
             }
         })
         .catch(error => {
@@ -131,6 +170,7 @@ function updateCalendar() {
             document.getElementById('calendar').textContent = "Error loading calendar.";
         });
 }
+
 
 // Play Speech Audio and Start Animation
 function playSpeechAudio(audioSrc) {

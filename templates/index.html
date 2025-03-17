@@ -1,25 +1,31 @@
-<!DOCTYPE html>z`
+<!DOCTYPE html>
 <html>
 <head>
     <title>Smart Mirror</title>
     <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
-<div id="time-widget" class="widget">
-    <div id="time"></div>
-    <div id="date"></div>
-</div>
-<div id="weather" class="widget">
-    <img id="weather-icon" style="vertical-align: middle;" />
-    <span id="weather-description"></span>
-</div>
-<div id="news" class="widget"></div>
-<div id="crypto" class="widget"></div>
-<div id="calendar" class="widget"></div>
-<div id="voice-response" class="widget"></div>
+    <div class="container">
+        <div id="time-widget" class="widget">
+            <div id="time"></div>
+            <div id="date"></div>
+        </div>
 
-<canvas id="voice-visualizer"></canvas>
+        <div id="weather" class="widget">
+            <img id="weather-icon" style="vertical-align: middle;" />
+            <span id="weather-description"></span>
+        </div>
+
+        <div id="news" class="widget"></div>
+        <div id="crypto" class="widget"></div>
+
+        <div id="calendar" class="widget"></div>
+        <div id="voice-response" class="widget"></div>
+    </div>
+
+    <canvas id="voice-visualizer"></canvas>
 
     <script src="static/script.js"></script>
 </body>
+
 </html>
