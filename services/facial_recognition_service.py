@@ -2,7 +2,7 @@ import cv2
 import face_recognition
 import pickle
 import time
-# Load or save known faces
+
 def load_known_faces():
     try:
         with open("pictures/known_faces.pkl", "rb") as file:
@@ -14,14 +14,13 @@ def save_known_faces(known_faces):
     with open("pictures/known_faces.pkl", "wb") as file:
         pickle.dump(known_faces, file)
 
-
 def recognize_faces_vocally():
     from services.voice_service import speak_response
     known_faces = load_known_faces()
     known_encodings = list(known_faces.values())
     known_names = list(known_faces.keys())
     start_time = time.time()
-    wating_time = 120 # looks for a face for 20s
+    wating_time = 20 # looks for a face for 20s
 
     video_capture = cv2.VideoCapture(0)
     speak_response("Let's see who it is...")
@@ -98,7 +97,6 @@ def add_face_vocally(name=None):
 
         known_faces[name] = face_encodings[0]
         save_known_faces(known_faces)
-        # speak_response(f"Face added successfully for {name}.")
         break
 
     video_capture.release()

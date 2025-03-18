@@ -80,7 +80,6 @@ def speak_response(response_text):
         logging.error(f"Error in TTS response: {e}")
         return {"text": "", "duration": 0, "audio_url": ""}
 
-
 def wake_word_detected():
     #Detect wake word using Porcupine.
     access_key = os.getenv("PORCUPINE_ACCESS_KEY")
@@ -101,7 +100,6 @@ def wake_word_detected():
         recorder.stop()
         porcupine.delete()
 
-
 def listen_command():
     #Listen for a voice command after wake word.
     recognizer = sr.Recognizer()
@@ -116,7 +114,6 @@ def listen_command():
             return "No command detected"
         except sr.RequestError:
             return "Error with the speech recognition service"
-
 
 def process_command(command):
     # Check for event creation command
@@ -219,11 +216,8 @@ def handle_command(command):
         logging.error(f"Error parsing command: {ve}")
         return None
 
-
-
 def random_phrase(phrases):
     return random.choice(phrases)
-
 
 def wait_for_wake_and_command():
     while True:
@@ -262,7 +256,6 @@ def wait_for_wake_and_command():
                 speak_response(f"How can i assist you")
                 break
 
-
         while True:
             if user_name == "ghost":
                 break
@@ -299,8 +292,6 @@ def wait_for_wake_and_command():
 
                 # If not recognized
                 speak_response("I didn't understand that. Can you repeat?")
-
-
 
 def chat_with_gpt(prompt):
     #Interact with OpenAI's GPT model for general queries.
