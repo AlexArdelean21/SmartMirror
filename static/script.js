@@ -114,6 +114,89 @@ function updateCalendar() {
         });
 }
 
+const voiceVisualizer = document.getElementById("voice-visualizer");
+const voiceResponseContainer = document.getElementById("voice-response");
+
+let audioContext = null;
+let analyzer, source, dataArray, bufferLength;
+
+function initVoiceVisualizer() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyzer = audioContext.createAnalyser();
+        analyzer.fftSize = 32;
+        bufferLength = analyzer.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+    }
+}
+
+
+// Start visualization when AI speech plays
+function startVoiceVisualization(audioElement) {
+    initVoiceVisualizer();
+
+    // Ensure a new source is created for each audio playback
+    if (source) {
+        source.disconnect();
+    }
+
+    source = audioContext.createMediaElementSource(audioElement);
+    source.connect(analyzer);
+    analyzer.connect(audioContext.destination);
+
+    voiceResponseContainer.classList.add("speaking");
+    drawVoiceWave();
+}
+
+
+// Draw a **waveform visualization**
+function drawVoiceWave() {
+    const ctx = voiceVisualizer.getContext("2d");
+    voiceVisualizer.width = voiceResponseContainer.clientWidth;
+    voiceVisualizer.height = 50;
+
+    function animate() {
+        if (!voiceResponseContainer.classList.contains("speaking")) {
+            ctx.clearRect(0, 0, voiceVisualizer.width, voiceVisualizer.height);
+            return;
+        }
+
+        requestAnimationFrame(animate);
+        analyzer.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, voiceVisualizer.width, voiceVisualizer.height);
+
+        const barWidth = (voiceVisualizer.width / bufferLength) * 1.5;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+            const barHeight = dataArray[i] / 2;
+            ctx.fillStyle = `rgba(255, 255, 255, ${barHeight / 255})`;
+            ctx.fillRect(x, voiceVisualizer.height - barHeight, barWidth, barHeight);
+            x += barWidth + 2;
+        }
+    }
+
+    animate();
+}
+
+// Modify AI speech function to trigger visualization
+function playSpeechAudio(audioSrc) {
+    const audio = new Audio(audioSrc);
+
+    audio.addEventListener("play", () => {
+        startVoiceVisualization(audio);
+    });
+
+    audio.play().catch(error => {
+        console.error("Audio play failed:", error);
+    });
+
+    audio.onended = () => {
+        voiceResponseContainer.classList.remove("speaking");
+    };
+}
+
 // Schedule updates
 updateTimeAndDate();
 updateWeather();

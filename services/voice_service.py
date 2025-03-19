@@ -219,6 +219,7 @@ def handle_command(command):
 def random_phrase(phrases):
     return random.choice(phrases)
 
+
 def wait_for_wake_and_command():
     while True:
         if wake_word_detected():
@@ -227,7 +228,7 @@ def wait_for_wake_and_command():
         while True:
             known_faces = load_known_faces()
             if user_name == "ghost":
-                speak_response("Maybe I'm hearin things!")
+                speak_response("Maybe I'm hearing things!")
                 break
 
             if user_name == "Unknown":
@@ -238,22 +239,22 @@ def wait_for_wake_and_command():
                     speak_response("Please state your name clearly.")
                     user_name = listen_command()
 
-                    if user_name or user_name.lower() in known_faces:
-                        speak_response(f"This username is taken, try another one.")
-                        continue # ???????
+                    if user_name in known_faces:
+                        speak_response(f"This username is taken. Try another one.")
+                        continue
 
-                    if user_name:
+                    if user_name != "Unknown":
                         speak_response(f"Registering {user_name}. Please look at the camera.")
                         add_face_vocally(user_name)
-                        speak_response(f"Face registered successfully. Hello {user_name}! How can i assist you?")
+                        speak_response(f"Face registered successfully. Hello {user_name}! How can I assist you?")
                         break
                     else:
                         speak_response("I didn't catch your name. Please try again.")
                 else:
-                    speak_response("Unknown user - limited access.")
+                    speak_response("Unknown user - limited access. What can i do for you?")
                     break
             else:
-                speak_response(f"How can i assist you")
+                speak_response(f"Hello {user_name}, how can I assist you?")
                 break
 
         while True:
@@ -274,24 +275,24 @@ def wait_for_wake_and_command():
 
             while True:
                 time.sleep(2)
-                speak_response(random_phrase(FOLLOW_UP_ASK))
+                follow_up = random_phrase(FOLLOW_UP_ASK)
+                speak_response(follow_up)
 
                 follow_up_command = listen_command()
                 if not follow_up_command or "no command" in follow_up_command:
                     speak_response("I didn't understand that. Can you repeat?")
                     continue
 
-                if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]): # dosen't understand no
+                if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]):
                     speak_response("Alright, see you later.")
-                    return  # Exit back to wake word
+                    return
 
-                # dosen't understand thse yet( it dose if you say more words like "yes please")
                 if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]):
                     speak_response(random_phrase(FOLLOW_UP_YES))
                     break
 
-                # If not recognized
                 speak_response("I didn't understand that. Can you repeat?")
+
 
 def chat_with_gpt(prompt):
     #Interact with OpenAI's GPT model for general queries.
