@@ -205,7 +205,7 @@ updateCrypto();
 updateCalendar();
 
 setInterval(updateCalendar, 600000); // Refresh every 10 minutes
-setInterval(updateTimeAndDate, 1000); // Update time every 5 second
+setInterval(updateTimeAndDate, 5000); // Update time every 5 second
 setInterval(updateWeather, 300000); // Update weather every 5 minutes
 setInterval(updateNews, 60000); // Update news every 10 minutes
 setInterval(updateCrypto, 300000); // Update crypto prices every 5 minutes

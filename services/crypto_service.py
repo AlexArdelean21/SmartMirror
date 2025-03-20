@@ -1,18 +1,6 @@
 import requests
-import time
 import logging
-
-cache = {}
-CACHE_TIMEOUT = 300  # Cache for 5 minutes
-
-def get_cached_data(key):
-    if key in cache and (time.time() - cache[key]["timestamp"] < CACHE_TIMEOUT):
-        return cache[key]["data"]
-    return None
-
-def set_cache(key, data):
-    cache[key] = {"data": data, "timestamp": time.time()}
-
+from util.cache import get_cached_data, set_cache
 
 def get_crypto_prices():
     cached_data = get_cached_data("crypto")
@@ -30,7 +18,7 @@ def get_crypto_prices():
                 "bitcoin": data["bitcoin"]["usd"],
                 "ethereum": data["ethereum"]["usd"]
             }
-            set_cache("crypto", prices)  # Store in cache
+            set_cache("crypto", prices)  # Store result in cache
             return prices
         else:
             raise ValueError("Incomplete data from Crypto API")
@@ -38,4 +26,3 @@ def get_crypto_prices():
     except requests.RequestException as e:
         logging.error(f"Error fetching cryptocurrency data: {e}")
         return {"error": "Failed to fetch cryptocurrency prices"}
-
