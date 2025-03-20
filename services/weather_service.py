@@ -14,29 +14,33 @@ def get_weather():
     try:
         api_key = os.environ.get("WEATHER_API_KEY")
         if not api_key:
-            raise ValueError("Weather API key not found. Set WEATHER_API_KEY in system environment.")
+            return {"error": "Missing API key"}, 400
 
-        location = os.getenv("LOCATION")
+        location = os.getenv("LOCATION", "Bucharest")
         weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={api_key}&units=metric"
         response = requests.get(weather_url)
+
+        if response.status_code == 401:
+            return {"error": "Invalid API key"}, 401
+        elif response.status_code == 404:
+            return {"error": f"City '{location}' not found"}, 404
+        elif response.status_code >= 500:
+            return {"error": "Weather service unavailable"}, 503
+
         response.raise_for_status()
         data = response.json()
 
-        if 'main' in data and 'temp' in data['main'] and 'weather' in data:
-            temp_celsius = data['main']['temp']
-            description = data['weather'][0]['description']
-            icon = f"http://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png"
-
+        if 'main' in data and 'weather' in data:
             weather_data = {
-                "main": {"temp": temp_celsius},
-                "weather": [{"description": description, "icon": icon}]
+                "main": {"temp": data['main']['temp']},
+                "weather": [{"description": data['weather'][0]['description'],
+                             "icon": f"http://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png"}]
             }
-
-            set_cache("weather", weather_data)  # Save data to cache
+            set_cache("weather", weather_data)
             return weather_data
         else:
-            raise ValueError("Incomplete data in Weather API response")
+            return {"error": "Unexpected response format"}, 502
 
-    except (requests.RequestException, ValueError) as e:
-        logging.error(f"Error fetching weather data: {e}")
-        return {"error": "Failed to fetch weather data"}, 500
+    except requests.RequestException as e:
+        logging.error(f"Weather API error: {e}")
+        return {"error": "Failed to retrieve weather data"}, 500

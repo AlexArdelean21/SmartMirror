@@ -27,18 +27,23 @@ def get_upcoming_events(max_results=5):
         time_min = datetime.now(timezone.utc).isoformat()
 
         events_result = service.events().list(
-            calendarId='ardelean.alex2003@gmail.com',  # Use your calendar ID
+            calendarId='ardelean.alex2003@gmail.com',
             timeMin=time_min,
             maxResults=max_results,
             singleEvents=True,
             orderBy='startTime'
         ).execute()
         events = events_result.get('items', [])
-        logging.info(f"Fetched upcoming events: {events}")
+
+        if not events:
+            return {"message": "No upcoming events"}
+
         return events
+
     except Exception as e:
-        logging.error(f"Error fetching calendar events: {e}")
-        return {"error": "Failed to fetch events"}
+        logging.error(f"Calendar API error: {e}")
+        return {"error": "Google Calendar API request failed"}, 500
+
 
 def add_event(summary, start_time, end_time, description=None):
     try:
