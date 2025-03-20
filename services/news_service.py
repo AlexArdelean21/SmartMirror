@@ -12,7 +12,10 @@ def get_news():
         return cached_data
 
     try:
-        api_key = os.getenv("NEWS_API_KEY")
+        api_key = os.environ.get("NEWS_API_KEY")
+        if not api_key:
+            raise ValueError("News API key not found. Set NEWS_API_KEY in system environment.")
+
         country = os.getenv("NEWS_COUNTRY", "us")
         news_url = f"https://gnews.io/api/v4/top-headlines?country={country}&token={api_key}"
         response = requests.get(news_url)

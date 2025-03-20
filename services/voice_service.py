@@ -21,7 +21,11 @@ from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+google_credentials = os.environ.get("GOOGLE_CREDENTIALS_PATH")
+if google_credentials:
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_credentials
+else:
+    raise ValueError("Google credentials path not set.")
 
 def initialize_google_tts_client():
     return texttospeech.TextToSpeechClient()

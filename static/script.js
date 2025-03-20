@@ -1,3 +1,8 @@
+let previousWeather = "";
+let previousNews = "";
+let previousCrypto = "";
+let previousCalendar = "";
+
 // Update Time and Date
 function updateTimeAndDate() {
     fetch('/time_date')
@@ -26,18 +31,22 @@ function updateWeather() {
     fetch('/weather')
         .then(response => response.json())
         .then(data => {
+            let newWeatherText = `${data.weather[0].description}, ${data.main.temp}°C`;
             let weatherDesc = document.getElementById('weather-description');
             let weatherIcon = document.getElementById('weather-icon');
 
-            if (weatherDesc.textContent !== `${data.weather[0].description}, ${data.main.temp}°C`) {
-                weatherDesc.textContent = `${data.weather[0].description}, ${data.main.temp}°C`;
+            if (previousWeather !== newWeatherText) {  // Only update if data changes
+                previousWeather = newWeatherText;
+                weatherDesc.textContent = newWeatherText;
                 weatherDesc.classList.add('widget-update');
                 setTimeout(() => weatherDesc.classList.remove('widget-update'), 300);
             }
 
             weatherIcon.src = data.weather[0].icon;
-        });
+        })
+        .catch(error => console.error('Error fetching weather:', error));
 }
+
 
 // Update News
 function updateNews() {
@@ -45,9 +54,11 @@ function updateNews() {
         .then(response => response.json())
         .then(data => {
             let newsElement = document.getElementById('news-content');
+            let latestNews = `News: ${data.articles[0].title}`;
 
-            if (newsElement.textContent !== `News: ${data.articles[0].title}`) {
-                newsElement.textContent = `News: ${data.articles[0].title}`;
+            if (previousNews !== latestNews) {
+                previousNews = latestNews;
+                newsElement.textContent = latestNews;
                 newsElement.classList.add('widget-update');
                 setTimeout(() => newsElement.classList.remove('widget-update'), 300);
             }
@@ -60,9 +71,10 @@ function updateCrypto() {
         .then(response => response.json())
         .then(data => {
             let cryptoElement = document.getElementById('crypto-content');
-
             let newCryptoText = `Bitcoin: $${data.bitcoin}, Ethereum: $${data.ethereum}`;
-            if (cryptoElement.textContent !== newCryptoText) {
+
+            if (previousCrypto !== newCryptoText) {
+                previousCrypto = newCryptoText;
                 cryptoElement.textContent = newCryptoText;
                 cryptoElement.classList.add('widget-update');
                 setTimeout(() => cryptoElement.classList.remove('widget-update'), 300);
@@ -101,7 +113,8 @@ function updateCalendar() {
                     `<div class="calendar-event">${event.summary} - ${event.start.dateTime || event.start.date}</div>`
                 ).join('');
 
-                if (calendarDiv.innerHTML !== newCalendarHTML) {
+                if (previousCalendar !== newCalendarHTML) {
+                    previousCalendar = newCalendarHTML;
                     calendarDiv.innerHTML = newCalendarHTML;
                     calendarDiv.classList.add('widget-update');
                     setTimeout(() => calendarDiv.classList.remove('widget-update'), 300);
@@ -112,89 +125,6 @@ function updateCalendar() {
             console.error("Error fetching calendar:", error);
             document.getElementById('calendar').textContent = "Error loading calendar.";
         });
-}
-
-const voiceVisualizer = document.getElementById("voice-visualizer");
-const voiceResponseContainer = document.getElementById("voice-response");
-
-let audioContext = null;
-let analyzer, source, dataArray, bufferLength;
-
-function initVoiceVisualizer() {
-    if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyzer = audioContext.createAnalyser();
-        analyzer.fftSize = 32;
-        bufferLength = analyzer.frequencyBinCount;
-        dataArray = new Uint8Array(bufferLength);
-    }
-}
-
-
-// Start visualization when AI speech plays
-function startVoiceVisualization(audioElement) {
-    initVoiceVisualizer();
-
-    // Ensure a new source is created for each audio playback
-    if (source) {
-        source.disconnect();
-    }
-
-    source = audioContext.createMediaElementSource(audioElement);
-    source.connect(analyzer);
-    analyzer.connect(audioContext.destination);
-
-    voiceResponseContainer.classList.add("speaking");
-    drawVoiceWave();
-}
-
-
-// Draw a **waveform visualization**
-function drawVoiceWave() {
-    const ctx = voiceVisualizer.getContext("2d");
-    voiceVisualizer.width = voiceResponseContainer.clientWidth;
-    voiceVisualizer.height = 50;
-
-    function animate() {
-        if (!voiceResponseContainer.classList.contains("speaking")) {
-            ctx.clearRect(0, 0, voiceVisualizer.width, voiceVisualizer.height);
-            return;
-        }
-
-        requestAnimationFrame(animate);
-        analyzer.getByteFrequencyData(dataArray);
-
-        ctx.clearRect(0, 0, voiceVisualizer.width, voiceVisualizer.height);
-
-        const barWidth = (voiceVisualizer.width / bufferLength) * 1.5;
-        let x = 0;
-
-        for (let i = 0; i < bufferLength; i++) {
-            const barHeight = dataArray[i] / 2;
-            ctx.fillStyle = `rgba(255, 255, 255, ${barHeight / 255})`;
-            ctx.fillRect(x, voiceVisualizer.height - barHeight, barWidth, barHeight);
-            x += barWidth + 2;
-        }
-    }
-
-    animate();
-}
-
-// Modify AI speech function to trigger visualization
-function playSpeechAudio(audioSrc) {
-    const audio = new Audio(audioSrc);
-
-    audio.addEventListener("play", () => {
-        startVoiceVisualization(audio);
-    });
-
-    audio.play().catch(error => {
-        console.error("Audio play failed:", error);
-    });
-
-    audio.onended = () => {
-        voiceResponseContainer.classList.remove("speaking");
-    };
 }
 
 // Schedule updates

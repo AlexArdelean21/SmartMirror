@@ -8,7 +8,10 @@ import logging
 load_dotenv()  # Load environment variables
 
 def get_calendar_service():
-    credentials_path = os.getenv("GOOGLE_CALENDAR_CREDENTIALS")
+    credentials_path = os.environ.get("GOOGLE_CREDENTIALS_PATH")
+    if not credentials_path:
+        raise ValueError("Google credentials path not set.")
+
     if not credentials_path:
         raise ValueError("GOOGLE_CALENDAR_CREDENTIALS not found in .env")
 

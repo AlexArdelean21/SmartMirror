@@ -9,10 +9,13 @@ load_dotenv()
 def get_weather():
     cached_data = get_cached_data("weather")
     if cached_data:
-        return cached_data  # Return cached weather data if available
+        return cached_data
 
     try:
-        api_key = os.getenv("WEATHER_API_KEY")
+        api_key = os.environ.get("WEATHER_API_KEY")
+        if not api_key:
+            raise ValueError("Weather API key not found. Set WEATHER_API_KEY in system environment.")
+
         location = os.getenv("LOCATION")
         weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={api_key}&units=metric"
         response = requests.get(weather_url)
