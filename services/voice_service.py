@@ -168,15 +168,21 @@ def process_command(command):
 
 def handle_command(command):
     try:
-        # Parse the title, excluding phrases like "event called" or "called"
-        title_match = re.search(r"(?:add an event|create an event|an event called|event called|called) ['\"]?(.+?)['\"]?(?: today| tomorrow| on \w+day| at .*)?$", command, re.IGNORECASE)
-        if title_match:
-            title = title_match.group(1).strip()
-        else:
+        # Step 1: Extract the event title (without the word "called", "today", etc.)
+        title_match = re.search(
+            r"(?:add|create)(?: an)? event(?: called)? (.+?) (?:today|tomorrow|on \w+day)? at \d+(:\d+)? ?(am|pm)?",
+            command, re.IGNORECASE
+        )
+        if not title_match:
             raise ValueError("Event title not found in command.")
 
-        # Parse date and time
-        time_match = re.search(r"(today|tomorrow|on \w+day) at (\d+)(:\d+)? ?(AM|PM)?", command, re.IGNORECASE)
+        raw_title = title_match.group(1).strip(" '\"").strip()
+
+        # Step 2: Extract time and day
+        time_match = re.search(
+            r"(today|tomorrow|on \w+day) at (\d+)(:\d+)? ?(AM|PM)?",
+            command, re.IGNORECASE
+        )
         if not time_match:
             raise ValueError("Date and time not found in command.")
 
@@ -212,7 +218,7 @@ def handle_command(command):
         end_time = (event_date + timedelta(hours=1)).replace(hour=hour, minute=minutes, second=0).isoformat()
 
         return {
-            "summary": title,
+            "summary": title_match,
             "start_time": start_time,
             "end_time": end_time
         }
@@ -324,5 +330,5 @@ def main():
                 print(f"Response: {response}")
                 speak_response(response)
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

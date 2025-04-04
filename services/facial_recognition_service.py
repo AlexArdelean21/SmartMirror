@@ -53,7 +53,7 @@ def recognize_faces_vocally():
             if True in matches:
                 match_index = matches.index(True)
                 name = known_names[match_index]
-                speak_response(f"Hello {name}, welcome back!")
+                # speak_response(f"Hello {name}, welcome back!")
                 video_capture.release()
                 return name
 

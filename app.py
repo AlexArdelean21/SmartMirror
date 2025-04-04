@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, render_template, request
+from threading import Thread
 
-from services.calendar_service import get_upcoming_events, add_event
+from services.calendar_service import get_upcoming_events, add_event as calendar_add_event
 from services.voice_service import wait_for_wake_and_command
 from services.weather_service import get_weather
 from services.datetime_service import get_time_date
@@ -8,7 +9,6 @@ from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
 from flask_caching import Cache
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally
-
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})  # 5-minute cache
@@ -44,11 +44,8 @@ def crypto():
 
 @app.route('/voice_command')
 def voice_command():
-    response = wait_for_wake_and_command()
-    if isinstance(response, dict) and "audio_url" in response:
-        return jsonify(response)  # Now includes text + audio
-    return jsonify({"text": "No response", "audio_url": None})
-
+    # No longer triggering the infinite loop here
+    return jsonify({"text": "Voice assistant is running in the background.", "audio_url": None})
 
 @app.route('/refresh')
 def refresh():
@@ -64,9 +61,8 @@ def calendar():
         return jsonify({"message": "No upcoming events"}), 200
     return jsonify(events)
 
-
 @app.route('/add_event', methods=['POST'])
-def add_event():
+def add_event_route():
     data = request.json
     summary = data.get('summary')
     start_time = data.get('start_time')
@@ -76,15 +72,14 @@ def add_event():
     if not all([summary, start_time, end_time]):
         return jsonify({"error": "Missing required event details"}), 400
 
-    result = add_event(summary, start_time, end_time, description)
+    result = calendar_add_event(summary, start_time, end_time, description)
     return jsonify(result)
 
 @app.route('/add_face', methods=['POST'])
 def add_face_route():
     data = request.json
     name = data.get("name")
-    image_path = data.get("image_path")
-    result = add_face_vocally(name, image_path)
+    result = add_face_vocally(name)
     return jsonify(result)
 
 @app.route('/recognize_faces', methods=['GET'])
@@ -92,6 +87,7 @@ def recognize_faces_route():
     recognize_faces_vocally()
     return jsonify({"status": "success", "message": "Recognition session completed"})
 
-
 if __name__ == '__main__':
+    # Launch voice assistant ONCE in background
+    Thread(target=wait_for_wake_and_command, daemon=True).start()
     app.run(host='0.0.0.0', port=5000)
