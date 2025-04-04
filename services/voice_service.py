@@ -231,77 +231,95 @@ def random_phrase(phrases):
 
 
 def wait_for_wake_and_command():
+    user_name = None
+    last_recognition_time = 0 # UNIX timestamp
+
     while True:
+        # OUTER LOOP — Always running, listens for "Hey Adonis"
         if wake_word_detected():
-            user_name = recognize_faces_vocally()
+            current_time = time.time()
+            needs_recognition = user_name is None or (current_time - last_recognition_time > 600)
 
-        while True:
-            known_faces = load_known_faces()
-            if user_name == "ghost":
-                speak_response("Maybe I'm hearing things!")
-                break
-
-            if user_name == "Unknown":
-                speak_response("I don't recognize you. Would you like to register?")
-                user_response = listen_command()
-
-                if any(word in user_response.lower() for word in ["yes", "sure", "okay", "yeah"]):
-                    speak_response("Please state your name clearly.")
-                    user_name = listen_command()
-
-                    if user_name in known_faces:
-                        speak_response(f"This username is taken. Try another one.")
-                        continue
-
-                    if user_name != "Unknown":
-                        speak_response(f"Registering {user_name}. Please look at the camera.")
-                        add_face_vocally(user_name)
-                        speak_response(f"Face registered successfully. Hello {user_name}! How can I assist you?")
-                        break
-                    else:
-                        speak_response("I didn't catch your name. Please try again.")
-                else:
-                    speak_response("Unknown user - limited access. What can i do for you?")
-                    break
-            else:
-                speak_response(f"Hello {user_name}, how can I assist you?")
-                break
-
-        while True:
-            if user_name == "ghost":
-                break
-
-            command = listen_command()
-            if not command or "no command" in command:
-                speak_response("I didn't catch that. Please repeat.")
-                continue
-
-            if any(phrase in command for phrase in ["no", "that's all", "stop", "nothing"]):
-                speak_response("Alright, see you later.")
-                return
-
-            response = process_command(command)
-            speak_response(response)
+            if needs_recognition:
+                user_name = recognize_faces_vocally()
+                last_recognition_time = current_time
 
             while True:
-                time.sleep(2)
-                follow_up = random_phrase(FOLLOW_UP_ASK)
-                speak_response(follow_up)
+                # FACE RECOGNITION LOOP — Handles known/unknown faces
+                known_faces = load_known_faces()
+                if user_name == "ghost":
+                    speak_response("Maybe I'm hearing things!")
+                    break  # Restart from the outer loop
 
-                follow_up_command = listen_command()
-                if not follow_up_command or "no command" in follow_up_command:
-                    speak_response("I didn't understand that. Can you repeat?")
+                if user_name == "Unknown":
+                    speak_response("I don't recognize you. Would you like to register?")
+                    user_response = listen_command()
+
+                    if any(word in user_response.lower() for word in ["yes", "sure", "okay", "yeah"]):
+                        speak_response("Please state your name clearly.")
+                        user_name = listen_command()
+
+                        if user_name in known_faces:
+                            speak_response(f"This username is taken. Try another one.")
+                            continue  # Ask for a different name again
+
+                        if user_name != "Unknown":
+                            speak_response(f"Registering {user_name}. Please look at the camera.")
+                            add_face_vocally(user_name)
+                            speak_response(f"Face registered successfully. Hello {user_name}! How can I assist you?")
+                            break
+                        else:
+                            speak_response("I didn't catch your name. Please try again.")
+                    else:
+                        speak_response("Unknown user - limited access. What can I do for you?")
+                        break
+                else:
+                    speak_response(f"Hello {user_name}, how can I assist you?")
+                    break  # Continue to command loop
+
+            session_active = True
+
+            while session_active:
+                # COMMAND LOOP — Handles the first command and responses
+                if user_name == "ghost":
+                    break  # Return to outer loop
+
+                command = listen_command()
+                if not command or "no command" in command:
+                    speak_response("I didn't catch that. Please repeat.")
                     continue
 
-                if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]):
+                if any(phrase in command for phrase in ["no", "that's all", "stop", "nothing"]):
                     speak_response("Alright, see you later.")
-                    return
+                    break  # End conversation and restart from wake word loop
 
-                if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]):
-                    speak_response(random_phrase(FOLLOW_UP_YES))
-                    break
+                response = process_command(command)
+                speak_response(response)
 
-                speak_response("I didn't understand that. Can you repeat?")
+                while True:
+                    # FOLLOW-UP LOOP — Offers follow-up interaction
+                    time.sleep(2)
+                    follow_up = random_phrase(FOLLOW_UP_ASK)
+                    speak_response(follow_up)
+
+                    follow_up_command = listen_command()
+                    if not follow_up_command or "no command" in follow_up_command:
+                        speak_response("I didn't understand that. Can you repeat?")
+                        continue
+
+                    if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]):
+                        speak_response("Alright, see you later.")
+                        session_active = False
+                        break  # Exit follow-up loop and restart from wake word
+
+                    if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]):
+                        speak_response(random_phrase(FOLLOW_UP_YES))
+                        break  # Ask for another command
+
+                    speak_response("I didn't understand that. Can you repeat?")
+
+        continue  # Go back to listening for wake word
+
 
 
 def chat_with_gpt(prompt):
@@ -329,6 +347,3 @@ def main():
                 response = process_command(command)
                 print(f"Response: {response}")
                 speak_response(response)
-
-# if __name__ == "__main__":
-#     main()
