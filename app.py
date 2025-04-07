@@ -9,9 +9,12 @@ from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
 from flask_caching import Cache
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally
+import logging
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})  # 5-minute cache
+werkzeug_log = logging.getLogger('werkzeug')
+werkzeug_log.setLevel(logging.WARNING)  # shows errors, needs to be  commented when i want to see endpoint calls
 
 @app.route('/')
 def home():

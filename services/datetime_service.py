@@ -1,7 +1,21 @@
 from datetime import datetime
+import time
+from util.cache import get_cached_data, set_cache
+from util.logger import logger
+
+CACHE_TIMEOUT = 30
 
 def get_time_date():
+    cached = get_cached_data("time_date")
+    if cached:
+        return cached
+
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     current_date = now.strftime("%Y-%m-%d")
-    return {"time": current_time, "date": current_date}
+    data = {"time": current_time, "date": current_date}
+
+    set_cache("time_date", data)
+    logger.info(f"Generated current time/date: {data}")
+    return data
+

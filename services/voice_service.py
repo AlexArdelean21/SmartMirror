@@ -12,7 +12,7 @@ from pydub.playback import play
 from tempfile import NamedTemporaryFile
 from openai import OpenAI
 from dotenv import load_dotenv
-import logging
+from util.logger import logger
 import random
 import time
 import os
@@ -46,6 +46,8 @@ FOLLOW_UP_YES = [
 
 def speak_response(response_text):
     try:
+        logger.info(f"TTS starting for response: {response_text}")
+
         client = initialize_google_tts_client()
         synthesis_input = texttospeech.SynthesisInput(text=response_text)
         voice = texttospeech.VoiceSelectionParams(
@@ -63,6 +65,7 @@ def speak_response(response_text):
         audio_file_path = "static/audio_response.mp3"
         with open(audio_file_path, "wb") as out:
             out.write(response.audio_content)
+        logger.debug(f"TTS audio saved to {audio_file_path}")
 
         # Play the audio response
         with NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
@@ -73,24 +76,29 @@ def speak_response(response_text):
             duration = len(audio) / 1000.0  # Duration in seconds
             try:
                 play(audio)
+                logger.debug("TTS audio played successfully.")
             except OSError as e:
-                logging.error(f"Audio playback failed: {e}")
+                logger.error(f"Audio playback failed: {e}")
             finally:
                 os.remove(temp_audio.name)
+                logger.debug("Temporary audio file deleted.")
 
         return {"text": response_text, "duration": duration, "audio_url": f"/{audio_file_path}"}
 
     except Exception as e:
-        logging.error(f"Error in TTS response: {e}")
+        logger.exception(f"TTS generation failed: {e}")
         return {"text": "", "duration": 0, "audio_url": ""}
 
+
 def wake_word_detected():
-    #Detect wake word using Porcupine.
+    # Detect wake word using Porcupine.
     access_key = os.getenv("PORCUPINE_ACCESS_KEY")
     custom_model_path = os.path.join(os.path.dirname(__file__), "../hey_adonis.ppn")
+
     porcupine = pvporcupine.create(access_key=access_key, keyword_paths=[custom_model_path])
     recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
-    print("Listening for wake word...")
+
+    logger.info("Wake word listener started. Listening for 'Hey Adonis'...")
 
     try:
         recorder.start()
@@ -98,35 +106,45 @@ def wake_word_detected():
             pcm = recorder.read()
             keyword_index = porcupine.process(pcm)
             if keyword_index >= 0:
-                print("Wake word detected!")
                 return True
+    except Exception as e:
+        logger.exception(f"Wake word detection failed: {e}")
     finally:
         recorder.stop()
         porcupine.delete()
+        logger.debug("Porcupine recorder stopped and cleaned up.")
+
 
 def listen_command():
-    #Listen for a voice command after wake word.
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
-        print("Listening for a command...")
+        logger.info("Listening for a command...")
         try:
             audio = recognizer.listen(source, timeout=5)
             command = recognizer.recognize_google(audio).lower()
-            print(f"Recognized command: {command}")
             return command
-        except (sr.WaitTimeoutError, sr.UnknownValueError):
+        except sr.WaitTimeoutError:
+            logger.warning("No voice input detected (timeout).")
             return "No command detected"
-        except sr.RequestError:
+        except sr.UnknownValueError:
+            logger.warning("Could not understand the voice input.")
+            return "No command detected"
+        except sr.RequestError as e:
+            logger.error(f"Speech recognition service error: {e}")
             return "Error with the speech recognition service"
 
+
 def process_command(command):
+    logger.debug(f"Processing command: {command}")
+
     # Check for event creation command
     if "add an event" in command.lower():
+        logger.info("Detected calendar event creation command.")
         event_data = handle_command(command)
         if not event_data:
+            logger.warning("Event parsing failed.")
             return "I couldn't understand the event details. Please try again."
 
-        # Call add_event with parsed data
         try:
             result = add_event(
                 summary=event_data["summary"],
@@ -134,41 +152,44 @@ def process_command(command):
                 end_time=event_data["end_time"]
             )
             if result.get("status") == "success":
+                logger.info(f"Event '{event_data['summary']}' added successfully.")
                 return f"Event '{event_data['summary']}' added successfully."
             else:
+                logger.warning("Event creation failed in calendar service.")
                 return "Failed to add the event. Please try again."
         except Exception as e:
-            logging.error(f"Error adding event: {e}")
+            logger.exception(f"Error adding event: {e}")
             return "An error occurred while adding the event."
 
-    # Handle weather command
     elif "weather" in command:
+        logger.info("Detected weather request.")
         weather_data = get_weather()
         return f"The current weather is {weather_data['weather'][0]['description']}, {weather_data['main']['temp']} degrees Celsius."
 
-    # Handle news command
     elif "news" in command:
+        logger.info("Detected news request.")
         news_data = get_news()
         return f"Here's the latest news headline: {news_data['articles'][0]['title']}."
 
-    # Handle cryptocurrency prices command
     elif "crypto" in command:
+        logger.info("Detected crypto price request.")
         crypto_data = get_crypto_prices()
         return f"Bitcoin is ${crypto_data['bitcoin']}, Ethereum is ${crypto_data['ethereum']}."
 
     elif "start facial recognition" in command:
+        logger.info("Starting facial recognition process.")
         return recognize_faces_vocally()
 
     elif "add my face" in command:
+        logger.info("Starting face registration process.")
         return add_face_vocally()
 
-    # Default fallback to chat with GPT
     else:
+        logger.info("Command not recognized. Falling back to GPT.")
         return chat_with_gpt(command)
 
 def handle_command(command):
     try:
-        # Step 1: Extract the event title (without the word "called", "today", etc.)
         title_match = re.search(
             r"(?:add|create)(?: an)? event(?: called)? (.+?) (?:today|tomorrow|on \w+day)? at \d+(:\d+)? ?(am|pm)?",
             command, re.IGNORECASE
@@ -178,7 +199,6 @@ def handle_command(command):
 
         raw_title = title_match.group(1).strip(" '\"").strip()
 
-        # Step 2: Extract time and day
         time_match = re.search(
             r"(today|tomorrow|on \w+day) at (\d+)(:\d+)? ?(AM|PM)?",
             command, re.IGNORECASE
@@ -209,7 +229,6 @@ def handle_command(command):
             elif meridian.upper() == "AM" and hour == 12:
                 hour = 0
         else:
-            # Default to PM if meridian is missing and hour is in a reasonable range
             if hour < 9:
                 hour += 12
 
@@ -217,14 +236,17 @@ def handle_command(command):
         start_time = event_date.replace(hour=hour, minute=minutes, second=0).isoformat()
         end_time = (event_date + timedelta(hours=1)).replace(hour=hour, minute=minutes, second=0).isoformat()
 
+        logger.debug(f"Parsed event: '{raw_title}' from command.")
         return {
-            "summary": title_match,
+            "summary": raw_title,
             "start_time": start_time,
             "end_time": end_time
         }
+
     except ValueError as ve:
-        logging.error(f"Error parsing command: {ve}")
+        logger.warning(f"Error parsing command: {ve}")
         return None
+
 
 def random_phrase(phrases):
     return random.choice(phrases)
@@ -232,24 +254,27 @@ def random_phrase(phrases):
 
 def wait_for_wake_and_command():
     user_name = None
-    last_recognition_time = 0 # UNIX timestamp
+    last_recognition_time = 0  # UNIX timestamp
 
     while True:
-        # OUTER LOOP — Always running, listens for "Hey Adonis"
+        logger.debug("Listening for wake word...")
         if wake_word_detected():
+            logger.info("Wake word detected.")
             current_time = time.time()
             needs_recognition = user_name is None or (current_time - last_recognition_time > 600)
 
             if needs_recognition:
                 user_name = recognize_faces_vocally()
                 last_recognition_time = current_time
+                logger.info(f"Recognized user: {user_name}")
 
             while True:
-                # FACE RECOGNITION LOOP — Handles known/unknown faces
                 known_faces = load_known_faces()
+
                 if user_name == "ghost":
+                    logger.info("No face detected. Restarting loop.")
                     speak_response("Maybe I'm hearing things!")
-                    break  # Restart from the outer loop
+                    break
 
                 if user_name == "Unknown":
                     speak_response("I don't recognize you. Would you like to register?")
@@ -260,13 +285,15 @@ def wait_for_wake_and_command():
                         user_name = listen_command()
 
                         if user_name in known_faces:
-                            speak_response(f"This username is taken. Try another one.")
-                            continue  # Ask for a different name again
+                            speak_response("This username is taken. Try another one.")
+                            logger.warning(f"Registration blocked — name already taken: {user_name}")
+                            continue
 
                         if user_name != "Unknown":
                             speak_response(f"Registering {user_name}. Please look at the camera.")
                             add_face_vocally(user_name)
                             speak_response(f"Face registered successfully. Hello {user_name}! How can I assist you?")
+                            logger.info(f"New user registered: {user_name}")
                             break
                         else:
                             speak_response("I didn't catch your name. Please try again.")
@@ -275,29 +302,30 @@ def wait_for_wake_and_command():
                         break
                 else:
                     speak_response(f"Hello {user_name}, how can I assist you?")
-                    break  # Continue to command loop
+                    break
 
             session_active = True
-
             while session_active:
-                # COMMAND LOOP — Handles the first command and responses
                 if user_name == "ghost":
-                    break  # Return to outer loop
+                    logger.info("Session interrupted — no face.")
+                    break
 
                 command = listen_command()
                 if not command or "no command" in command:
+                    logger.warning("No command detected. Asking user to repeat.")
                     speak_response("I didn't catch that. Please repeat.")
                     continue
 
                 if any(phrase in command for phrase in ["no", "that's all", "stop", "nothing"]):
                     speak_response("Alright, see you later.")
-                    break  # End conversation and restart from wake word loop
+                    logger.info("Session ended by user.")
+                    break
 
+                logger.info(f"Processing command: {command}")
                 response = process_command(command)
                 speak_response(response)
 
                 while True:
-                    # FOLLOW-UP LOOP — Offers follow-up interaction
                     time.sleep(2)
                     follow_up = random_phrase(FOLLOW_UP_ASK)
                     speak_response(follow_up)
@@ -305,45 +333,49 @@ def wait_for_wake_and_command():
                     follow_up_command = listen_command()
                     if not follow_up_command or "no command" in follow_up_command:
                         speak_response("I didn't understand that. Can you repeat?")
+                        logger.warning("No follow-up command detected.")
                         continue
 
                     if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]):
                         speak_response("Alright, see you later.")
+                        logger.info("Follow-up session ended.")
                         session_active = False
-                        break  # Exit follow-up loop and restart from wake word
+                        break
 
                     if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]):
                         speak_response(random_phrase(FOLLOW_UP_YES))
-                        break  # Ask for another command
+                        logger.info("Follow-up accepted, awaiting new command...")
+                        break
 
                     speak_response("I didn't understand that. Can you repeat?")
-
-        continue  # Go back to listening for wake word
-
+                    logger.warning("Unrecognized follow-up command.")
 
 
 def chat_with_gpt(prompt):
-    #Interact with OpenAI's GPT model for general queries.
+    # Interact with OpenAI's GPT model for general queries.
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
-        return response.choices[0].message.content
+        message = response.choices[0].message.content
+        logger.debug(f"GPT response: {message}")
+        return message
     except Exception as e:
-        print(f"Error: {e}")
+        logger.exception(f"GPT interaction failed: {e}")
         return "Sorry, I couldn’t process that request."
 
+
 def main():
-    #Run the continuous voice assistant.
+    # Run the continuous voice assistant.
     while True:
-        # Wait for wake word
         if wake_word_detected():
-            print("Wake word detected, playing 'How can I assist you?'")
+            logger.info("Wake word detected — entering interaction mode.")
             speak_response("How can I assist you?")
             command = listen_command()
             if command and "no command" not in command:
+                logger.info(f"Received voice command: {command}")
                 response = process_command(command)
-                print(f"Response: {response}")
+                logger.info(f"Command response: {response}")
                 speak_response(response)

@@ -12,3 +12,5 @@ Overview of the Project.txt
 
 # Ignore Google Cloud credentials
 *.json
+
+logs/
