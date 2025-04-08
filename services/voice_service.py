@@ -3,13 +3,11 @@ from services.weather_service import get_weather
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally, load_known_faces
+from services.user_profile_service import get_user_profile, save_user_profile, create_default_profile, create_profile_interactively
 import pvporcupine
 from pvrecorder import PvRecorder
-import speech_recognition as sr
 from google.cloud import texttospeech
-from pydub import AudioSegment
-from pydub.playback import play
-from tempfile import NamedTemporaryFile
+from util.voice_utils import speak_response, listen_command
 from openai import OpenAI
 from dotenv import load_dotenv
 from util.logger import logger
@@ -44,52 +42,6 @@ FOLLOW_UP_YES = [
     "I'm here for you, what's next?"
 ]
 
-def speak_response(response_text):
-    try:
-        logger.info(f"TTS starting for response: {response_text}")
-
-        client = initialize_google_tts_client()
-        synthesis_input = texttospeech.SynthesisInput(text=response_text)
-        voice = texttospeech.VoiceSelectionParams(
-            language_code="en-US",
-            name="en-US-Wavenet-F",
-            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
-        )
-        audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
-
-        response = client.synthesize_speech(
-            input=synthesis_input, voice=voice, audio_config=audio_config
-        )
-
-        # Save audio for web playback
-        audio_file_path = "static/audio_response.mp3"
-        with open(audio_file_path, "wb") as out:
-            out.write(response.audio_content)
-        logger.debug(f"TTS audio saved to {audio_file_path}")
-
-        # Play the audio response
-        with NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
-            temp_audio.write(response.audio_content)
-            temp_audio.close()
-            audio = AudioSegment.from_file(temp_audio.name, format="mp3")
-
-            duration = len(audio) / 1000.0  # Duration in seconds
-            try:
-                play(audio)
-                logger.debug("TTS audio played successfully.")
-            except OSError as e:
-                logger.error(f"Audio playback failed: {e}")
-            finally:
-                os.remove(temp_audio.name)
-                logger.debug("Temporary audio file deleted.")
-
-        return {"text": response_text, "duration": duration, "audio_url": f"/{audio_file_path}"}
-
-    except Exception as e:
-        logger.exception(f"TTS generation failed: {e}")
-        return {"text": "", "duration": 0, "audio_url": ""}
-
-
 def wake_word_detected():
     # Detect wake word using Porcupine.
     access_key = os.getenv("PORCUPINE_ACCESS_KEY")
@@ -114,31 +66,15 @@ def wake_word_detected():
         porcupine.delete()
         logger.debug("Porcupine recorder stopped and cleaned up.")
 
-
-def listen_command():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        logger.info("Listening for a command...")
-        try:
-            audio = recognizer.listen(source, timeout=5)
-            command = recognizer.recognize_google(audio).lower()
-            return command
-        except sr.WaitTimeoutError:
-            logger.warning("No voice input detected (timeout).")
-            return "No command detected"
-        except sr.UnknownValueError:
-            logger.warning("Could not understand the voice input.")
-            return "No command detected"
-        except sr.RequestError as e:
-            logger.error(f"Speech recognition service error: {e}")
-            return "Error with the speech recognition service"
-
-
-def process_command(command):
+def process_command(command, user_profile=None):
     logger.debug(f"Processing command: {command}")
 
     # Check for event creation command
     if "add an event" in command.lower():
+        if user_profile and user_profile.get("name", "").lower() != "alex":
+            logger.warning(f"Unauthorized calendar access attempt by: {user_profile.get('name')}")
+            return "Sorry, calendar access is restricted."
+
         logger.info("Detected calendar event creation command.")
         event_data = handle_command(command)
         if not event_data:
@@ -254,7 +190,8 @@ def random_phrase(phrases):
 
 def wait_for_wake_and_command():
     user_name = None
-    last_recognition_time = 0  # UNIX timestamp
+    current_user_profile = None
+    last_recognition_time = 0
 
     while True:
         logger.debug("Listening for wake word...")
@@ -268,14 +205,15 @@ def wait_for_wake_and_command():
                 last_recognition_time = current_time
                 logger.info(f"Recognized user: {user_name}")
 
-            while True:
-                known_faces = load_known_faces()
-
+                # Ghost = No profile, no session
                 if user_name == "ghost":
                     logger.info("No face detected. Restarting loop.")
                     speak_response("Maybe I'm hearing things!")
-                    break
+                    continue
 
+                known_faces = load_known_faces()
+
+                # Handle "Unknown" face
                 if user_name == "Unknown":
                     speak_response("I don't recognize you. Would you like to register?")
                     user_response = listen_command()
@@ -292,17 +230,56 @@ def wait_for_wake_and_command():
                         if user_name != "Unknown":
                             speak_response(f"Registering {user_name}. Please look at the camera.")
                             add_face_vocally(user_name)
-                            speak_response(f"Face registered successfully. Hello {user_name}! How can I assist you?")
-                            logger.info(f"New user registered: {user_name}")
-                            break
-                        else:
-                            speak_response("I didn't catch your name. Please try again.")
+                            speak_response(f"Face registered successfully. Hello {user_name}!")
+
+                            # Setup profile
+                            profile = create_profile_interactively(user_name)
+                            current_user_profile = profile
+                            logger.info(f"New user registered and profile saved: {user_name}")
                     else:
-                        speak_response("Unknown user - limited access. What can I do for you?")
-                        break
+                        speak_response("Alright. You can use the mirror with limited access.")
+                        user_name = "unknown"
+                        profile = get_user_profile("unknown")
+                        if not profile:
+                            logger.warning("Fallback 'unknown' profile not found. Using inline default.")
+                            profile = {
+                                "name": "Unknown",
+                                "preferences": {
+                                    "location": "Bucharest",
+                                    "language": "en",
+                                    "theme": "dark",
+                                    "news_topics": ["technology", "world"]
+                                }
+                            }
+                        current_user_profile = profile
+                        logger.info(f"'Unknown' profile used for unregistered user.")
                 else:
+                    # Recognized face
+                    profile = get_user_profile(user_name)
+                    if not profile:
+                        speak_response(f"I don't have a profile for you, {user_name}. Would you like to create one?")
+                        answer = listen_command()
+
+                        if any(word in answer.lower() for word in ["yes", "sure", "okay", "yeah"]):
+                            profile = create_profile_interactively(user_name)
+                            logger.info(f"New profile created interactively for: {user_name}")
+                        else:
+                            profile = get_user_profile("unknown")
+                            if not profile:
+                                logger.warning("Fallback 'unknown' profile not found. Using inline default.")
+                                profile = {
+                                    "name": "Unknown",
+                                    "preferences": {
+                                        "location": "Bucuresti",
+                                        "language": "en",
+                                        "theme": "dark",
+                                        "news_topics": ["technology", "world"]
+                                    }
+                                }
+                            logger.info(f"'Unknown' default profile loaded for user: {user_name}")
+
+                    current_user_profile = profile
                     speak_response(f"Hello {user_name}, how can I assist you?")
-                    break
 
             session_active = True
             while session_active:
@@ -322,7 +299,7 @@ def wait_for_wake_and_command():
                     break
 
                 logger.info(f"Processing command: {command}")
-                response = process_command(command)
+                response = process_command(command, current_user_profile)
                 speak_response(response)
 
                 while True:
@@ -366,16 +343,3 @@ def chat_with_gpt(prompt):
         logger.exception(f"GPT interaction failed: {e}")
         return "Sorry, I couldn’t process that request."
 
-
-def main():
-    # Run the continuous voice assistant.
-    while True:
-        if wake_word_detected():
-            logger.info("Wake word detected — entering interaction mode.")
-            speak_response("How can I assist you?")
-            command = listen_command()
-            if command and "no command" not in command:
-                logger.info(f"Received voice command: {command}")
-                response = process_command(command)
-                logger.info(f"Command response: {response}")
-                speak_response(response)

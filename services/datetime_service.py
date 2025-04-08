@@ -6,16 +6,11 @@ from util.logger import logger
 CACHE_TIMEOUT = 30
 
 def get_time_date():
-    cached = get_cached_data("time_date")
-    if cached:
-        return cached
-
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     current_date = now.strftime("%Y-%m-%d")
     data = {"time": current_time, "date": current_date}
 
     set_cache("time_date", data)
-    logger.info(f"Generated current time/date: {data}")
     return data
 
