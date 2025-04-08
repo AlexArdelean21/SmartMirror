@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, render_template, request
 from threading import Thread
-
+from util.session_state import get_active_profile
 from services.calendar_service import get_upcoming_events, add_event as calendar_add_event
 from services.voice_service import wait_for_wake_and_command
 from services.weather_service import get_weather
@@ -10,7 +10,7 @@ from services.crypto_service import get_crypto_prices
 from flask_caching import Cache
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally
 import logging
-
+from util.logger import logger
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})  # 5-minute cache
 werkzeug_log = logging.getLogger('werkzeug')
@@ -55,14 +55,26 @@ def refresh():
     cache.clear()
     return jsonify({"status": "Cache cleared", "message": "Data will refresh on next request."})
 
-@app.route('/calendar')
+
+@app.route("/calendar")
+#@cache.cached(timeout=300)
 def calendar():
-    events = get_upcoming_events()
-    if "error" in events:
-        return jsonify(events), 500
-    if len(events) == 0:
-        return jsonify({"message": "No upcoming events"}), 200
-    return jsonify(events)
+    profile = get_active_profile()
+    if not profile:
+        logger.info("Calendar access attempted without login.")
+        return jsonify({"message": "Please log in to view your calendar."}), 200
+
+    if profile.get("name", "").lower() != "alex":
+        logger.info(f"Unauthorized calendar access by: {profile.get('name')}")
+        return jsonify({"message": "This calendar is private."}), 200
+
+    try:
+        events = get_upcoming_events()
+        return jsonify(events)
+    except Exception as e:
+        logger.exception(f"Error fetching calendar events: {e}")
+        return jsonify({"error": "Failed to fetch calendar events"}), 500
+
 
 @app.route('/add_event', methods=['POST'])
 def add_event_route():

@@ -4,8 +4,6 @@ from util.logger import logger
 from util.voice_utils import speak_response, listen_command
 
 PROFILE_DIR = "user_profiles"
-
-
 def get_user_profile(username):
     filepath = os.path.join(PROFILE_DIR, f"{username.lower()}.json")
 
@@ -46,7 +44,6 @@ def create_default_profile(username):
             "news_topics": ["technology", "us"]
         }
     }
-
 
 def create_profile_interactively(username):
     speak_response(f"Welcome {username}! Let's set up your profile.")

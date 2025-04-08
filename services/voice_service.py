@@ -3,7 +3,8 @@ from services.weather_service import get_weather
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally, load_known_faces
-from services.user_profile_service import get_user_profile, save_user_profile, create_default_profile, create_profile_interactively
+from services.user_profile_service import get_user_profile, create_profile_interactively
+from util.session_state import set_active_profile
 import pvporcupine
 from pvrecorder import PvRecorder
 from google.cloud import texttospeech
@@ -99,12 +100,15 @@ def process_command(command, user_profile=None):
 
     elif "weather" in command:
         logger.info("Detected weather request.")
-        weather_data = get_weather()
+        location = user_profile["preferences"].get("location", "Bucharest") if user_profile else "Bucharest"
+        weather_data = get_weather(location=location)
         return f"The current weather is {weather_data['weather'][0]['description']}, {weather_data['main']['temp']} degrees Celsius."
 
     elif "news" in command:
         logger.info("Detected news request.")
-        news_data = get_news()
+        topics = user_profile["preferences"].get("news_topics", ["technology"]) if user_profile else ["technology"]
+        news_data = get_news(topics=topics)
+
         return f"Here's the latest news headline: {news_data['articles'][0]['title']}."
 
     elif "crypto" in command:
@@ -235,6 +239,7 @@ def wait_for_wake_and_command():
                             # Setup profile
                             profile = create_profile_interactively(user_name)
                             current_user_profile = profile
+                            set_active_profile(profile)
                             logger.info(f"New user registered and profile saved: {user_name}")
                     else:
                         speak_response("Alright. You can use the mirror with limited access.")
@@ -252,6 +257,7 @@ def wait_for_wake_and_command():
                                 }
                             }
                         current_user_profile = profile
+                        set_active_profile(profile)
                         logger.info(f"'Unknown' profile used for unregistered user.")
                 else:
                     # Recognized face
@@ -270,7 +276,7 @@ def wait_for_wake_and_command():
                                 profile = {
                                     "name": "Unknown",
                                     "preferences": {
-                                        "location": "Bucuresti",
+                                        "location": "Bucharest",
                                         "language": "en",
                                         "theme": "dark",
                                         "news_topics": ["technology", "world"]
@@ -279,6 +285,7 @@ def wait_for_wake_and_command():
                             logger.info(f"'Unknown' default profile loaded for user: {user_name}")
 
                     current_user_profile = profile
+                    set_active_profile(profile)
                     speak_response(f"Hello {user_name}, how can I assist you?")
 
             session_active = True
@@ -341,5 +348,5 @@ def chat_with_gpt(prompt):
         return message
     except Exception as e:
         logger.exception(f"GPT interaction failed: {e}")
-        return "Sorry, I couldn’t process that request."
+        return "Sorry, I couldn't process that request."
 

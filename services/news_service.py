@@ -6,19 +6,25 @@ from util.logger import logger
 
 load_dotenv()
 
-def get_news():
+def get_news(topics=None):
     logger.info("Checking news cache...")
-    cached_data = get_cached_data("news")
+
+    # Build a cache key that changes based on topic
+    if not topics:
+        topics = ["technology"]
+    cache_key = f"news_{'_'.join(topics)}"
+
+    cached_data = get_cached_data(cache_key)
     if cached_data:
         logger.debug(f"Using cached news data: {cached_data}")
         return cached_data
 
-    logger.info("Fetching top headlines from GNews API...")
+    logger.info(f"Fetching news from GNews for topics: {topics}")
 
     try:
         api_key = os.getenv("NEWS_API_KEY")
-        country = os.getenv("NEWS_COUNTRY", "us")
-        news_url = f"https://gnews.io/api/v4/top-headlines?country={country}&token={api_key}"
+        query = " OR ".join(topics)
+        news_url = f"https://gnews.io/api/v4/search?q={query}&lang=en&max=10&token={api_key}"
 
         response = requests.get(news_url)
         response.raise_for_status()
@@ -26,11 +32,11 @@ def get_news():
 
         if 'articles' in data:
             result = {"articles": data['articles']}
-            set_cache("news", result)
+            set_cache(cache_key, result)
             logger.info("News data fetched and cached successfully.")
             return result
         else:
-            logger.warning("⚠nexpected structure in GNews API response.")
+            logger.warning("⚠ Unexpected structure in GNews API response.")
             raise ValueError("Missing 'articles' in news API response.")
 
     except requests.RequestException as e:

@@ -6,9 +6,13 @@ from util.logger import logger
 
 load_dotenv()
 
-def get_weather():
-    logger.info("Checking weather cache...")
-    cached_data = get_cached_data("weather")
+def get_weather(location=None):
+    if not location:
+        location = os.getenv("LOCATION")
+
+    logger.info(f"Checking weather cache for location: {location}")
+    cache_key = f"weather_{location.lower()}"
+    cached_data = get_cached_data(cache_key)
     if cached_data:
         logger.debug(f"Using cached weather data: {cached_data}")
         return cached_data
@@ -17,12 +21,17 @@ def get_weather():
 
     try:
         api_key = os.getenv("WEATHER_API_KEY")
-        location = os.getenv("LOCATION")
+        if not location:
+            location = os.getenv("LOCATION", "Bucharest")
         weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={api_key}&units=metric"
 
         response = requests.get(weather_url)
         response.raise_for_status()
         data = response.json()
+
+        if data.get("cod") == "404":
+            logger.warning(f"City '{location}' not found in weather API.")
+            return {"error": f"City '{location}' not found."}, 404
 
         if 'main' in data and 'temp' in data['main'] and 'weather' in data:
             temp_celsius = data['main']['temp']
