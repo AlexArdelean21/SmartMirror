@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, url_for, send_from_directory
 from threading import Thread
 from util.session_state import get_active_profile
 from services.calendar_service import get_upcoming_events, add_event as calendar_add_event
@@ -7,11 +7,16 @@ from services.weather_service import get_weather
 from services.datetime_service import get_time_date
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
+from util.socket_manager import socketio
 from flask_caching import Cache
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally
 import logging
+import time
+import os
 from util.logger import logger
+
 app = Flask(__name__)
+socketio.init_app(app, cors_allowed_origins="*")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})  # 5-minute cache
 werkzeug_log = logging.getLogger('werkzeug')
 werkzeug_log.setLevel(logging.WARNING)  # shows errors, needs to be  commented when i want to see endpoint calls
@@ -45,10 +50,26 @@ def crypto():
         return jsonify(crypto_data), 500
     return jsonify(crypto_data)
 
+
 @app.route('/voice_command')
 def voice_command():
-    # No longer triggering the infinite loop here
-    return jsonify({"text": "Voice assistant is running in the background.", "audio_url": None})
+    audio_path = "static/audio_response.mp3"
+
+    # Wait briefly to ensure file is done writing
+    time.sleep(0.3)
+
+    if os.path.exists(audio_path):
+        return jsonify({
+            "text": "Voice assistant is responding...",
+            "response_audio": url_for('static', filename='audio_response.mp3') + f"?t={int(time.time())}"
+        })
+    else:
+        return jsonify({
+            "text": "Voice assistant is running in the background.",
+            "response_audio": None
+        })
+
+
 
 @app.route('/refresh')
 def refresh():
@@ -103,6 +124,8 @@ def recognize_faces_route():
     return jsonify({"status": "success", "message": "Recognition session completed"})
 
 if __name__ == '__main__':
-    # Launch voice assistant ONCE in background
+    from services.voice_service import wait_for_wake_and_command
     Thread(target=wait_for_wake_and_command, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
+
+

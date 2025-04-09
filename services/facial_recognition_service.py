@@ -61,7 +61,6 @@ def recognize_faces_vocally():
             if True in matches:
                 match_index = matches.index(True)
                 name = known_names[match_index]
-                logger.info(f"Recognized face: {name}")
                 video_capture.release()
                 return name
 

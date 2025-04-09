@@ -7,6 +7,8 @@
 </head>
 
 <body>
+<button id="audio-init-button">Activate Voice</button>
+
 <div class="container">
     <div id="time-widget" class="widget">
         <div id="time"></div>
@@ -33,14 +35,16 @@
         <span id="calendar-content"></span>
     </div>
 
-    <div id="voice-response" class="widget">
-        <i class="fas fa-microphone"></i> <!-- Voice Icon -->
-        <span id="voice-text"></span>
+<div id="voice-response" class="widget">
+    <i class="fas fa-microphone"></i>
+    <span id="voice-text"></span>
+    <div class="visualizer-wrapper">
         <canvas id="voice-visualizer"></canvas>
     </div>
-
 </div>
 
+</div>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="static/script.js"></script>
 </body>
 

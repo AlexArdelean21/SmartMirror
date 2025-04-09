@@ -286,7 +286,14 @@ def wait_for_wake_and_command():
 
                     current_user_profile = profile
                     set_active_profile(profile)
-                    speak_response(f"Hello {user_name}, how can I assist you?")
+                    speak_response(f"Hello {user_name}, would you like to start a session?")
+                    confirmation = listen_command()
+
+                    if not confirmation or any(
+                            word in confirmation.lower() for word in ["no", "not now", "later", "stop"]):
+                        speak_response("Alright, I'll be here if you need me.")
+                        logger.info("Session declined by user.")
+                        continue
 
             session_active = True
             while session_active:
