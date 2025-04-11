@@ -2,7 +2,6 @@ from flask import Flask, jsonify, render_template, request, url_for, send_from_d
 from threading import Thread
 from util.session_state import get_active_profile
 from services.calendar_service import get_upcoming_events, add_event as calendar_add_event
-from services.voice_service import wait_for_wake_and_command
 from services.weather_service import get_weather
 from services.datetime_service import get_time_date
 from services.news_service import get_news
@@ -54,21 +53,28 @@ def crypto():
 @app.route('/voice_command')
 def voice_command():
     audio_path = "static/audio_response.mp3"
-
-    # Wait briefly to ensure file is done writing
-    time.sleep(0.3)
+    expiration_seconds = 10  # Only allow audio created in the last 10 seconds
 
     if os.path.exists(audio_path):
-        return jsonify({
-            "text": "Voice assistant is responding...",
-            "response_audio": url_for('static', filename='audio_response.mp3') + f"?t={int(time.time())}"
-        })
-    else:
-        return jsonify({
-            "text": "Voice assistant is running in the background.",
-            "response_audio": None
-        })
+        last_modified = os.path.getmtime(audio_path)
+        current_time = time.time()
 
+        # Check if the file is fresh
+        if current_time - last_modified < expiration_seconds:
+            return jsonify({
+                "text": "Voice assistant is responding...",
+                "response_audio": url_for('static', filename='audio_response.mp3') + f"?t={int(current_time)}"
+            })
+        else:
+            return jsonify({
+                "text": "Voice assistant is running in the background.",
+                "response_audio": None
+            })
+
+    return jsonify({
+        "text": "Voice assistant is running in the background.",
+        "response_audio": None
+    })
 
 
 @app.route('/refresh')

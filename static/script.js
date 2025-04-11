@@ -276,5 +276,3 @@ setInterval(updateTimeAndDate, 5000); // Update time every 5 second
 setInterval(updateWeather, 300000); // Update weather every 5 minutes
 setInterval(updateNews, 60000); // Update news every 10 minutes
 setInterval(updateCrypto, 300000); // Update crypto prices every 5 minutes
-//setInterval(pollVoiceResponse, 15000); // Poll voice assistant every 15 seconds
-//pollVoiceResponse();

@@ -7,9 +7,7 @@ from services.user_profile_service import get_user_profile, create_profile_inter
 from util.session_state import set_active_profile
 import pvporcupine
 from pvrecorder import PvRecorder
-from google.cloud import texttospeech
 from util.voice_utils import speak_response, listen_command
-from openai import OpenAI
 from dotenv import load_dotenv
 from util.logger import logger
 import random
@@ -20,14 +18,6 @@ from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
-google_credentials = os.environ.get("GOOGLE_CREDENTIALS_PATH")
-if google_credentials:
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_credentials
-else:
-    raise ValueError("Google credentials path not set.")
-
-def initialize_google_tts_client():
-    return texttospeech.TextToSpeechClient()
 
 FOLLOW_UP_ASK = [
     "Anything else?",
@@ -198,7 +188,6 @@ def wait_for_wake_and_command():
     last_recognition_time = 0
 
     while True:
-        logger.debug("Listening for wake word...")
         if wake_word_detected():
             logger.info("Wake word detected.")
             current_time = time.time()
@@ -245,6 +234,7 @@ def wait_for_wake_and_command():
                         speak_response("Alright. You can use the mirror with limited access.")
                         user_name = "unknown"
                         profile = get_user_profile("unknown")
+
                         if not profile:
                             logger.warning("Fallback 'unknown' profile not found. Using inline default.")
                             profile = {
@@ -287,13 +277,23 @@ def wait_for_wake_and_command():
                     current_user_profile = profile
                     set_active_profile(profile)
                     speak_response(f"Hello {user_name}, would you like to start a session?")
-                    confirmation = listen_command()
 
-                    if not confirmation or any(
-                            word in confirmation.lower() for word in ["no", "not now", "later", "stop"]):
+                    confirmation = listen_command()
+                    confirmation = confirmation.lower() if confirmation else ""
+
+                    if any(word in confirmation for word in ["no", "not now", "later", "stop", "maybe later"]):
                         speak_response("Alright, I'll be here if you need me.")
                         logger.info("Session declined by user.")
                         continue
+
+                    elif any(word in confirmation for word in
+                             ["yes", "sure", "okay", "yeah", "yep", "yes please", "alright"]):
+                        speak_response("Great, let's begin.")
+                        logger.info("Session confirmed by user.")
+
+                    else:
+                        speak_response("I wasn't sure what you meant, so I'll take that as a yes.")
+                        logger.info("Unclear confirmation — proceeding with session.")
 
             session_active = True
             while session_active:
@@ -343,6 +343,7 @@ def wait_for_wake_and_command():
 
 
 def chat_with_gpt(prompt):
+    from openai import OpenAI
     # Interact with OpenAI's GPT model for general queries.
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

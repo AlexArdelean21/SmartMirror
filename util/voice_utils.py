@@ -3,7 +3,27 @@ import os
 from google.cloud import texttospeech
 from util.logger import logger
 from util.socket_manager import socketio
+from util.audio_state import set_audio_playing, is_audio_playing
 import time
+
+def wait_for_audio_completion(text=None, max_timeout=8):
+    waited = 0
+
+    if not text:
+        estimated_duration = 2  # fallback default
+    else:
+        word_count = len(text.split())
+        estimated_duration = min(word_count * 0.5, max_timeout)
+
+    while is_audio_playing() and waited < estimated_duration:
+        time.sleep(0.2)
+        waited += 0.2
+
+    if is_audio_playing():
+        logger.warning("Audio playback wait timed out.")
+    else:
+        logger.debug("Audio playback confirmed as finished.")
+
 
 def speak_response(text):
     logger.info(f"TTS starting for response: {text}")
@@ -25,14 +45,10 @@ def speak_response(text):
         audio_config=audio_config
     )
 
-    audio_path = "static/audio_response.mp3"
-    logger.debug("Response ready. Browser should pick it up.")
-    socketio.emit("play_audio", {
-        "audio_url": f"/static/audio_response.mp3?t={int(time.time())}",
-        "text": text
-    })
+    set_audio_playing(True)
 
-    # Safely delete previous file if it exists
+    audio_path = "static/audio_response.mp3"
+
     try:
         if os.path.exists(audio_path):
             os.remove(audio_path)
@@ -46,9 +62,15 @@ def speak_response(text):
     except Exception as e:
         logger.exception(f"Failed to save TTS audio: {e}")
 
+    socketio.emit("play_audio", {
+        "audio_url": f"/static/audio_response.mp3?t={int(time.time())}",
+        "text": text
+    })
+
+    wait_for_audio_completion(text)
+
 
 def listen_command():
-    time.sleep(2) # wait 2 seconds to finsh talking (if not, it will only take his own question as a response)
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         logger.info("Listening for a command...")
@@ -63,5 +85,5 @@ def listen_command():
             logger.warning("Could not understand the voice input.")
             return "No command detected"
         except sr.RequestError as e:
-            logger.error(f"Speech recognition service error: {e}") 
+            logger.error(f"Speech recognition service error: {e}")
             return "Error with the speech recognition service"
