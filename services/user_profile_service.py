@@ -51,15 +51,14 @@ def create_profile_interactively(username):
     # Location
     speak_response("What city are you in?")
     location = listen_command()
-    if not location or "no command" in location:
+    if not location or "no command" in location.lower():
         location = "Bucharest"
         speak_response("I didn't catch that. I'll use Bucharest as default.")
 
     # News Topics
     speak_response("What kind of news would you like? Say tech, sports, world, etc.")
     raw_topics = listen_command()
-
-    if not raw_topics or "no command" in raw_topics:
+    if not raw_topics or "no command" in raw_topics.lower():
         news_topics = ["technology", "world"]
         speak_response("I didn't catch that. I'll pick technology and world news for now.")
     else:

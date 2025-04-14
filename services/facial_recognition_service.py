@@ -2,7 +2,9 @@ import cv2
 import face_recognition
 import pickle
 import time
+import os
 from util.logger import logger
+
 
 def load_known_faces():
     try:
@@ -13,10 +15,12 @@ def load_known_faces():
         logger.warning("known_faces.pkl not found. Returning empty dictionary.")
         return {}
 
+
 def save_known_faces(known_faces):
     with open("pictures/known_faces.pkl", "wb") as file:
         pickle.dump(known_faces, file)
         logger.info("Saved known faces to known_faces.pkl.")
+
 
 def recognize_faces_vocally():
     from services.voice_service import speak_response
@@ -77,7 +81,7 @@ def add_face_vocally(name=None):
         speak_response("Please state your name.")
         name = listen_command()
 
-    if name or name.lower() in known_faces:
+    if name.lower() in known_faces:
         logger.info(f"Face already registered for user: {name}")
         return f"You are already registered, {name}."
 
@@ -114,3 +118,38 @@ def add_face_vocally(name=None):
 
     video_capture.release()
     return "Face addition process complete."
+
+
+def list_registered_faces():  # admin function
+    try:
+        base_path = os.path.dirname(os.path.dirname(__file__))
+        face_path = os.path.join(base_path, "pictures", "known_faces.pkl")
+        with open(face_path, "rb") as f:
+            known_faces = pickle.load(f)
+            print("Raw known_faces loaded:", known_faces)
+            print("Type:", type(known_faces))
+            return list(known_faces.keys()) if isinstance(known_faces, dict) else []
+    except Exception as e:
+        print(f"Failed to load known_faces: {e}")
+        return []
+
+
+def delete_face_by_name(name):  # admin function
+    try:
+        base_path = os.path.dirname(os.path.dirname(__file__))
+        face_path = os.path.join(base_path, "pictures", "known_faces.pkl")
+
+        with open(face_path, "rb") as f:
+            known_faces = pickle.load(f)
+
+        if name in known_faces:
+            del known_faces[name]
+            with open(face_path, "wb") as f:
+                pickle.dump(known_faces, f)
+            print(f"Deleted face data for '{name}'.")
+        else:
+            print(f"No face found with the name '{name}'.")
+    except Exception as e:
+        print(f"Error: {e}")
+
+print(list_registered_faces())
