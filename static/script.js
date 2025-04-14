@@ -263,6 +263,18 @@ socket.on("play_audio", (data) => {
     document.getElementById("voice-text").textContent = data.text;
 });
 
+socket.on("start_listening", () => {
+    document.getElementById("voice-text").textContent = "Listening...";
+    document.getElementById("voice-response").classList.add("listening");
+    document.getElementById("mic-icon").classList.add("listening");
+});
+
+socket.on("stop_listening", () => {
+    document.getElementById("voice-text").textContent = "";
+    document.getElementById("voice-response").classList.remove("listening");
+    document.getElementById("mic-icon").classList.remove("listening");
+});
+
 
 // Schedule updates
 updateTimeAndDate();

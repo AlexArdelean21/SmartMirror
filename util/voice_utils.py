@@ -71,6 +71,7 @@ def speak_response(text):
 
 
 def listen_command():
+    socketio.emit("start_listening")
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         logger.info("Listening for a command...")
@@ -87,3 +88,6 @@ def listen_command():
         except sr.RequestError as e:
             logger.error(f"Speech recognition service error: {e}")
             return "Error with the speech recognition service"
+        finally:
+            socketio.emit("stop_listening")
+
