@@ -152,4 +152,4 @@ def delete_face_by_name(name):  # admin function
     except Exception as e:
         print(f"Error: {e}")
 
-print(list_registered_faces())
+#print(list_registered_faces())

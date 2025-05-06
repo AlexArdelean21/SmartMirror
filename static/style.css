@@ -206,3 +206,39 @@ body {
         text-shadow: 0 0 18px rgba(255, 255, 255, 1);
     }
 }
+
+#tryon-options img {
+    max-width: 150px;
+    border-radius: 10px;
+    background: white;
+    padding: 5px;
+}
+
+.product-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: white;
+    max-width: 150px;
+    margin-bottom: 10px;
+}
+
+
+#product-options {
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+body {
+    overflow-y: auto !important;
+}
+
+html, body {
+    height: auto;
+    min-height: 100vh;
+}
+
+.widget.double-span {
+    grid-column: span 2;
+}

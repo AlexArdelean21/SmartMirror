@@ -257,6 +257,41 @@ function triggerVoicePlayback(retries = 5, delay = 500) {
     tryFetchAudio();
 }
 
+function showTryOnOptions(category = "men's clothing", color = null, max_price = null) {
+    const url = new URL("/find_clothing", window.location.origin);
+    if (category) url.searchParams.append("category", category);
+    if (color) url.searchParams.append("color", color);
+    if (max_price) url.searchParams.append("max_price", max_price);
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error || data.message) {
+                console.warn("⚠️ No matching items or user not logged in:", data);
+                return;
+            }
+
+            const container = document.getElementById("product-options");
+            container.innerHTML = "";
+
+            data.forEach((item, index) => {
+                const card = document.createElement("div");
+                card.className = "product-card";
+                card.innerHTML = `
+                    <img src="${item.image_url}" alt="product-${index}" />
+                    <span><strong>Option ${index + 1}</strong></span>
+                    <span>${item.title}</span>
+                    <span>${item.price} lei</span>
+                `;
+                container.appendChild(card);
+            });
+
+            document.getElementById("tryon-options").style.display = "block";
+        })
+        .catch(error => console.error("❌ Error loading try-on options:", error));
+}
+
+
 socket.on("play_audio", (data) => {
     console.log("🔊 [Socket] Received voice playback:", data);
     playSpeechAudio(data.audio_url);

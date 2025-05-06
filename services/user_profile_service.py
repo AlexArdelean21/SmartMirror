@@ -51,18 +51,30 @@ def create_profile_interactively(username):
     # Location
     speak_response("What city are you in?")
     location = listen_command()
-    if not location or "no command" in location.lower():
+    if not location or "no command detected" in location.lower():
         location = "Bucharest"
         speak_response("I didn't catch that. I'll use Bucharest as default.")
+    else:
+        location = location.strip().title()
 
     # News Topics
+    ALLOWED_TOPICS = {"technology", "tech", "world", "sports", "business", "stock", "music", "science", "gaming"}
+
     speak_response("What kind of news would you like? Say tech, sports, world, etc.")
     raw_topics = listen_command()
-    if not raw_topics or "no command" in raw_topics.lower():
+
+    if not raw_topics or "no command detected" in raw_topics.lower():
         news_topics = ["technology", "world"]
         speak_response("I didn't catch that. I'll pick technology and world news for now.")
     else:
-        news_topics = [topic.strip().lower() for topic in raw_topics.split(",")]
+        parsed = [topic.strip().lower() for topic in raw_topics.split(",")]
+        valid = [t for t in parsed if t in ALLOWED_TOPICS]
+
+        if not valid:
+            news_topics = ["technology", "world"]
+            speak_response("That topic isn't recognized. I'll use technology and world for now.")
+        else:
+            news_topics = valid
 
     profile = {
         "name": username,

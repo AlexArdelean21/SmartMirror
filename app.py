@@ -6,6 +6,7 @@ from services.weather_service import get_weather
 from services.datetime_service import get_time_date
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
+from services.product_search_service import get_clothing_items
 from util.socket_manager import socketio
 from flask_caching import Cache
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally
@@ -128,6 +129,25 @@ def add_face_route():
 def recognize_faces_route():
     recognize_faces_vocally()
     return jsonify({"status": "success", "message": "Recognition session completed"})
+
+@app.route("/find_clothing")
+def find_clothing():
+    profile = get_active_profile()
+    if not profile:
+        logger.info("Unauthorized try-on request — no user logged in.")
+        return jsonify({"error": "You need to log in before using this feature."}), 403
+
+    category = request.args.get("category", "men's clothing")
+    color = request.args.get("color")
+    max_price = request.args.get("max_price", type=float)
+
+    logger.info(f"Finding clothing for {profile['name']}: category={category}, color={color}, max_price={max_price}")
+    items = get_clothing_items(category=category, color=color, max_price=max_price)
+
+    if not items:
+        return jsonify({"message": "No matching items found."}), 404
+
+    return jsonify(items)
 
 if __name__ == '__main__':
     from services.voice_service import wait_for_wake_and_command
