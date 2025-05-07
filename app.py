@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request, url_for, send_from_directory
+from flask import Flask, jsonify, render_template, request, url_for
 from threading import Thread
 from util.session_state import get_active_profile
 from services.calendar_service import get_upcoming_events, add_event as calendar_add_event

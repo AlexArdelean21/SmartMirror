@@ -4,6 +4,7 @@ from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally, load_known_faces
 from services.user_profile_service import get_user_profile, create_profile_interactively
+from services.product_search_service import handle_tryon_command
 from util.session_state import set_active_profile
 import pvporcupine
 from pvrecorder import PvRecorder
@@ -113,6 +114,15 @@ def process_command(command, user_profile=None):
     elif "add my face" in command:
         logger.info("Starting face registration process.")
         return add_face_vocally()
+
+    elif "try on" in command or "try a" in command:
+        logger.info("Detected try-on product command.")
+        return handle_tryon_command(command)
+
+    elif "option" in command and "try" in command:
+        logger.info("Detected option selection command.")
+        from services.product_search_service import handle_tryon_selection_command
+        return handle_tryon_selection_command(command)
 
     else:
         logger.info("Command not recognized. Falling back to GPT.")
@@ -314,7 +324,10 @@ def wait_for_wake_and_command():
 
                 logger.info(f"Processing command: {command}")
                 response = process_command(command, current_user_profile)
-                speak_response(response)
+                if response:
+                    speak_response(response)
+                else:
+                    logger.warning("TTS response was empty — skipping playback.")
 
                 while True:
                     time.sleep(2)

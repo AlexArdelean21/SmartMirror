@@ -3,6 +3,7 @@ let previousNews = "";
 let previousCrypto = "";
 let previousCalendar = "";
 const socket = io();
+let currentTryOnItems = [];
 
 // Update Time and Date
 function updateTimeAndDate() {
@@ -267,9 +268,11 @@ function showTryOnOptions(category = "men's clothing", color = null, max_price =
         .then(response => response.json())
         .then(data => {
             if (data.error || data.message) {
-                console.warn("⚠️ No matching items or user not logged in:", data);
+                console.warn("No matching items or user not logged in:", data);
                 return;
             }
+
+            currentTryOnItems = data;
 
             const container = document.getElementById("product-options");
             container.innerHTML = "";
@@ -287,13 +290,47 @@ function showTryOnOptions(category = "men's clothing", color = null, max_price =
             });
 
             document.getElementById("tryon-options").style.display = "block";
+            toggleWidgetsVisibility(true);
+            setTimeout(() => {
+                toggleWidgetsVisibility(false);
+                console.log("Auto-hide triggered: try-on options removed after 20s.");
+            }, 30000); // 30 seconds
+
         })
-        .catch(error => console.error("❌ Error loading try-on options:", error));
+        .catch(error => console.error("Error loading try-on options:", error));
 }
 
 
+function toggleWidgetsVisibility(showTryOn = true) {
+    const widgetsToToggle = ['weather', 'news', 'crypto', 'calendar'];
+
+    widgetsToToggle.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.style.display = showTryOn ? 'none' : 'flex';
+        }
+    });
+
+    const tryOnWidget = document.getElementById('tryon-options');
+    if (tryOnWidget) {
+        tryOnWidget.style.display = showTryOn ? 'block' : 'none';
+    }
+}
+
+function showStaticOverlay(imageUrl) {
+    const overlay = document.getElementById("overlay-item");
+    overlay.src = imageUrl;
+
+    document.getElementById("tryon-preview").style.display = "block";
+
+    // Optional: auto-hide after 20s
+    setTimeout(() => {
+        document.getElementById("tryon-preview").style.display = "none";
+    }, 20000);
+}
+
 socket.on("play_audio", (data) => {
-    console.log("🔊 [Socket] Received voice playback:", data);
+    console.log("[Socket] Received voice playback:", data);
     playSpeechAudio(data.audio_url);
     document.getElementById("voice-text").textContent = data.text;
 });
@@ -309,6 +346,36 @@ socket.on("stop_listening", () => {
     document.getElementById("voice-response").classList.remove("listening");
     document.getElementById("mic-icon").classList.remove("listening");
 });
+
+socket.on("trigger_tryon", (data) => {
+    console.log("Try-on trigger received:", data);
+
+    if (!data.category) {
+        toggleWidgetsVisibility(false);
+        document.getElementById("product-options").innerHTML = `
+            <span style="color:white;">No matching items found.</span>
+        `;
+        setTimeout(() => {
+            document.getElementById("product-options").innerHTML = "";
+        }, 4000);
+        return;
+    }
+
+    socket.on("try_on_selected_item", ({ index }) => {
+    console.log("Selected item index:", index);
+
+    const item = currentTryOnItems[index];
+    if (item) {
+        showStaticOverlay(item.image_url);
+    } else {
+        console.warn("No item found for selected index:", index);
+    }
+});
+
+    const { category, color, max_price } = data;
+    showTryOnOptions(category, color, max_price);
+});
+
 
 
 // Schedule updates

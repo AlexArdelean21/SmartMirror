@@ -242,3 +242,27 @@ html, body {
 .widget.double-span {
     grid-column: span 2;
 }
+
+#overlay-frame {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    width: 300px;
+    height: 400px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    position: relative;
+}
+
+#overlay-item {
+    max-width: 80%;
+    max-height: 80%;
+    opacity: 0.85;
+}
+
+#tryon-preview {
+    align-items: center;
+    justify-content: center;
+}
