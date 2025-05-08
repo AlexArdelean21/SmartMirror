@@ -1,7 +1,7 @@
 import requests
 from util.logger import logger
 from util.socket_manager import socketio
-from util.voice_utils import speak_response, listen_command
+from util.voice_utils import speak_response, listen_command, listen_short_command_with_vosk
 import re
 import os
 import time
@@ -41,7 +41,6 @@ def get_clothing_items(category="men's clothing", color=None, max_price=None):
 
 def handle_tryon_command(command):
     logger.info("Handling try-on voice command.")
-
     category = "men's clothing"
     color = None
     max_price = None
@@ -70,13 +69,12 @@ def handle_tryon_command(command):
         logger.info(f"No clothing items matched: {category}, {color}, {max_price}")
         speak_response(response_text)
 
-        # Optional: emit cleanup event if needed
         socketio.emit("trigger_tryon", {
             "category": None,
             "color": None,
             "max_price": None
         })
-        return None  # <- Prevents follow-up TTS
+        return None
 
     socketio.emit("trigger_tryon", {
         "category": category,
@@ -84,21 +82,34 @@ def handle_tryon_command(command):
         "max_price": max_price
     })
 
-    speak_response(f"Okay, here are some {color or ''} options. Would you like to try one?")
+    speak_response(f"Okay, here are some {color or ''} options. Would you like to try one? You can say yes, no, or wait.")
 
-    response = listen_command()
+    while True:
+        response = listen_short_command_with_vosk()
+        logger.info(f"User said (try-on follow-up): {response}")
 
-    if any(word in response for word in ["no", "nothing", "not now", "skip"]):
-        speak_response("Alright. Just say 'Hey Adonis' when you're ready again.")
-        return None
+        rejections = ["no", "nothing", "not now", "skip", "stop", "cancel", "i'm good", "i'm fine"]
+        holds = ["wait", "hold", "not yet", "later", "give me time", "not right now"]
 
-    elif any(word in response for word in ["wait", "hold", "not yet", "later"]):
-        speak_response("Okay, I'll check back in 20 seconds.")
-        time.sleep(20)
-        speak_response("Would you like to try one of them now?")
-        response = listen_command()
+        if any(phrase in response for phrase in rejections):
+            speak_response("Alright. Just say 'Hey Adonis' when you're ready again.")
+            return None
 
-    return handle_tryon_selection_command(response)
+        if any(phrase in response for phrase in holds):
+            speak_response("Okay, I'll check back in 20 seconds.")
+            time.sleep(20)
+            speak_response("Would you like to try one now?")
+            continue
+
+        selection_response = handle_tryon_selection_command(response)
+
+        if "didn't understand" in selection_response.lower():
+            speak_response(selection_response)
+            speak_response("Please say option one, two, or three.")
+            continue
+
+        return selection_response
+
 
 def handle_tryon_selection_command(command):
     logger.info("Handling try-on selection voice command.")

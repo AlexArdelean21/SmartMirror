@@ -5,6 +5,9 @@ from util.logger import logger
 from util.socket_manager import socketio
 from util.audio_state import set_audio_playing, is_audio_playing
 import time
+from vosk import Model, KaldiRecognizer
+import pyaudio
+import json
 
 def wait_for_audio_completion(text=None, max_timeout=8):
     waited = 0
@@ -91,3 +94,43 @@ def listen_command():
         finally:
             socketio.emit("stop_listening")
 
+
+
+vosk_model_path = "models/vosk-model-small-en-us-0.15"
+vosk_model = Model(vosk_model_path)
+vosk_recognizer = KaldiRecognizer(vosk_model, 16000)
+
+def listen_short_command_with_vosk(timeout=5):
+    logger.info("Listening (Vosk) for short command...")
+    socketio.emit("start_listening")  # 🔊 trigger frontend animation
+
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000,
+                    input=True, frames_per_buffer=8000)
+    stream.start_stream()
+
+    try:
+        result_text = ""
+        start_time = time.time()
+
+        while True:
+            if time.time() - start_time > timeout:
+                break
+
+            data = stream.read(4000, exception_on_overflow=False)
+            if vosk_recognizer.AcceptWaveform(data):
+                result = json.loads(vosk_recognizer.Result())
+                result_text = result.get("text", "")
+                break
+
+        return result_text.lower().strip() or "no command detected"
+
+    except Exception as e:
+        logger.exception("Vosk STT error:", exc_info=e)
+        return "error"
+
+    finally:
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+        socketio.emit("stop_listening")  #stop frontend animation

@@ -6,6 +6,7 @@ from services.facial_recognition_service import add_face_vocally, recognize_face
 from services.user_profile_service import get_user_profile, create_profile_interactively
 from services.product_search_service import handle_tryon_command
 from util.session_state import set_active_profile
+from util.voice_utils import listen_short_command_with_vosk
 import pvporcupine
 from pvrecorder import PvRecorder
 from util.voice_utils import speak_response, listen_command
@@ -201,7 +202,11 @@ def wait_for_wake_and_command():
         if wake_word_detected():
             logger.info("Wake word detected.")
             current_time = time.time()
-            needs_recognition = user_name is None or (current_time - last_recognition_time > 600)
+            needs_recognition = (
+                    user_name is None
+                    or user_name in ["ghost", "unknown"]
+                    or (current_time - last_recognition_time > 900)
+            )
 
             if needs_recognition:
                 user_name = recognize_faces_vocally()
@@ -219,7 +224,7 @@ def wait_for_wake_and_command():
                 # Handle "Unknown" face
                 if user_name == "Unknown":
                     speak_response("I don't recognize you. Would you like to register?")
-                    user_response = listen_command()
+                    user_response = listen_short_command_with_vosk()
 
                     if any(word in user_response.lower() for word in ["yes", "sure", "okay", "yeah"]):
                         speak_response("Please state your name clearly.")
@@ -264,7 +269,7 @@ def wait_for_wake_and_command():
                     profile = get_user_profile(user_name)
                     if not profile:
                         speak_response(f"I don't have a profile for you, {user_name}. Would you like to create one?")
-                        answer = listen_command()
+                        answer = listen_short_command_with_vosk()
 
                         if any(word in answer.lower() for word in ["yes", "sure", "okay", "yeah"]):
                             profile = create_profile_interactively(user_name)
@@ -288,7 +293,7 @@ def wait_for_wake_and_command():
                     set_active_profile(profile)
                     speak_response(f"Hello {user_name}, would you like to start a session?")
 
-                    confirmation = listen_command()
+                    confirmation = listen_short_command_with_vosk()
                     confirmation = confirmation.lower() if confirmation else ""
 
                     if any(word in confirmation for word in ["no", "not now", "later", "stop", "maybe later"]):
@@ -334,9 +339,9 @@ def wait_for_wake_and_command():
                     follow_up = random_phrase(FOLLOW_UP_ASK)
                     speak_response(follow_up)
 
-                    follow_up_command = listen_command()
+                    follow_up_command = listen_short_command_with_vosk()
                     if not follow_up_command or "no command" in follow_up_command:
-                        speak_response("I didn't understand that. Can you repeat?")
+                        speak_response("I didn't catch that. Please try again.")
                         logger.warning("No follow-up command detected.")
                         continue
 
@@ -346,13 +351,14 @@ def wait_for_wake_and_command():
                         session_active = False
                         break
 
-                    if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]):
-                        speak_response(random_phrase(FOLLOW_UP_YES))
-                        logger.info("Follow-up accepted, awaiting new command...")
-                        break
+                    # Treat all other input as a valid command
+                    logger.info(f"Processing follow-up command: {follow_up_command}")
+                    response = process_command(follow_up_command, current_user_profile)
 
-                    speak_response("I didn't understand that. Can you repeat?")
-                    logger.warning("Unrecognized follow-up command.")
+                    if response:
+                        speak_response(response)
+                    else:
+                        logger.warning("Follow-up command returned no response.")
 
 
 def chat_with_gpt(prompt):
