@@ -125,6 +125,8 @@ def process_command(command, user_profile=None):
         from services.product_search_service import handle_tryon_selection_command
         return handle_tryon_selection_command(command)
 
+    elif "tell me a joke" in command:
+        return "Why don’t skeletons fight each other? They don’t have the guts. "
     else:
         logger.info("Command not recognized. Falling back to GPT.")
         return chat_with_gpt(command)

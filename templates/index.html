@@ -43,9 +43,10 @@
     <div id="tryon-preview" class="widget double-span" style="display: none;">
         <h3>Virtual Try-On</h3>
         <div id="overlay-frame">
+            <video id="webcam-feed" autoplay playsinline></video>
             <img id="overlay-item" src="" alt="Overlay clothing" />
+        </div>
     </div>
-</div>
 
 
 <div id="voice-response" class="widget">
@@ -59,6 +60,9 @@
 
 </div>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <script src="static/script.js"></script>
 </body>
 

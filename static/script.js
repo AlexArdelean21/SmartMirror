@@ -4,6 +4,8 @@ let previousCrypto = "";
 let previousCalendar = "";
 const socket = io();
 let currentTryOnItems = [];
+let poseDetector = null;
+let webcamStream = null;
 
 // Update Time and Date
 function updateTimeAndDate() {
@@ -131,70 +133,51 @@ function updateCalendar() {
 
 
 function playSpeechAudio(audioUrl) {
-    console.log("📢 [playSpeechAudio] Audio URL:", audioUrl);
-
     const canvas = document.getElementById('voice-visualizer');
     const ctx = canvas.getContext('2d');
     const voiceBox = document.getElementById('voice-response');
-
     if (!audioUrl) {
-        console.warn("⚠ No audio URL provided. Skipping voice playback.");
         return;
     }
-
     const audio = new Audio(audioUrl);
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const source = audioContext.createMediaElementSource(audio);
     const analyser = audioContext.createAnalyser();
     const gainNode = audioContext.createGain();
-
     source.connect(analyser);
     analyser.connect(gainNode);
     gainNode.connect(audioContext.destination);
-
     analyser.fftSize = 2048;
     const bufferLength = analyser.fftSize;
     const dataArray = new Uint8Array(bufferLength);
-
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
-
     if (canvas.width === 0 || canvas.height === 0) {
         canvas.width = 360;
         canvas.height = 40;
     }
-
     voiceBox.classList.add('speaking');
-
     let animationFrameId;
-
     function drawSineWave() {
         analyser.getByteTimeDomainData(dataArray);
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgba(0, 200, 255, 0.8)';
         ctx.beginPath();
-
         const sliceWidth = canvas.width / bufferLength;
         let x = 0;
-
         for (let i = 0; i < bufferLength; i++) {
             const v = dataArray[i] / 128.0;
             const y = (v * canvas.height) / 2;
-
             if (i === 0) {
                 ctx.moveTo(x, y);
             } else {
                 ctx.lineTo(x, y);
             }
-
             x += sliceWidth;
         }
-
         ctx.lineTo(canvas.width, canvas.height / 2);
         ctx.stroke();
-
         if (!audio.paused && !audio.ended) {
             animationFrameId = requestAnimationFrame(drawSineWave);
         } else {
@@ -203,15 +186,11 @@ function playSpeechAudio(audioUrl) {
             cancelAnimationFrame(animationFrameId);
         }
     }
-
     audio.play()
         .then(() => {
-            console.log("Audio started successfully.");
             drawSineWave();
         })
-        .catch(error => {
-            console.error("Audio playback failed:", error);
-        });
+        .catch(error => {});
 }
 
 document.getElementById('audio-init-button').addEventListener('click', () => {
@@ -317,16 +296,143 @@ function toggleWidgetsVisibility(showTryOn = true) {
     }
 }
 
+async function initializeWebcam() {
+    try {
+        const video = document.getElementById('webcam-feed');
+        webcamStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: 300,
+                height: 400,
+                facingMode: 'user'
+            } 
+        });
+        video.srcObject = webcamStream;
+        // Initialize pose detector using BlazePose with CDN solutionPath
+        poseDetector = await poseDetection.createDetector(
+            poseDetection.SupportedModels.BlazePose,
+            {
+                runtime: 'mediapipe',
+                modelType: 'full',
+                solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose'
+            }
+        );
+        // Start pose detection
+        detectPose();
+    } catch (error) {
+        console.error('Error accessing webcam:', error);
+    }
+}
+
+async function detectPose() {
+    if (!poseDetector) return;
+    
+    const video = document.getElementById('webcam-feed');
+    const poses = await poseDetector.estimatePoses(video);
+    
+    if (poses.length > 0) {
+        const pose = poses[0];
+        updateOverlayPosition(pose);
+    }
+    
+    // Continue detection
+    requestAnimationFrame(detectPose);
+}
+
+function updateOverlayPosition(pose) {
+    const overlay = document.getElementById('overlay-item');
+    const video = document.getElementById('webcam-feed');
+    if (!overlay || !video) return;
+
+    // DEBUG: Log all keypoints
+    if (pose && pose.keypoints) {
+        console.log('Pose keypoints:', pose.keypoints);
+    }
+
+    // Support both snake_case and camelCase keypoint names
+    function getKeypoint(name1, name2) {
+        return pose.keypoints.find(kp => kp.name === name1 || kp.name === name2);
+    }
+    const leftShoulder = getKeypoint('left_shoulder', 'leftShoulder');
+    const rightShoulder = getKeypoint('right_shoulder', 'rightShoulder');
+    const leftHip = getKeypoint('left_hip', 'leftHip');
+    const rightHip = getKeypoint('right_hip', 'rightHip');
+
+    if (leftShoulder && rightShoulder && leftHip && rightHip) {
+        // Calculate chest center
+        const centerX = (leftShoulder.x + rightShoulder.x) / 2;
+        const centerY = (leftShoulder.y + rightShoulder.y) / 2;
+        // Calculate width (shoulder to shoulder)
+        const shoulderDist = Math.abs(rightShoulder.x - leftShoulder.x);
+        // Calculate height (shoulder to hip average)
+        const avgHipY = (leftHip.y + rightHip.y) / 2;
+        const chestHeight = avgHipY - centerY;
+        // Scaling factors for realism
+        const width = shoulderDist * 1.35; // even wider for realism
+        const height = chestHeight * 1.3;  // even longer for realism
+        // Position overlay so it's centered horizontally and starts at shoulders
+        overlay.style.position = 'absolute';
+        overlay.style.left = `${centerX - width / 2}px`;
+        overlay.style.top = `${centerY}px`;
+        overlay.style.width = `${width}px`;
+        overlay.style.height = `${height}px`;
+        overlay.style.maxWidth = '';
+        overlay.style.maxHeight = '';
+        overlay.style.transform = '';
+    } else {
+        // Fallback: center overlay
+        overlay.style.position = 'absolute';
+        overlay.style.left = '50%';
+        overlay.style.top = '50%';
+        overlay.style.transform = 'translate(-50%, -50%)';
+        overlay.style.width = '80%';
+        overlay.style.height = '80%';
+        overlay.style.maxWidth = '';
+        overlay.style.maxHeight = '';
+    }
+}
+
 function showStaticOverlay(imageUrl) {
     const overlay = document.getElementById("overlay-item");
     overlay.src = imageUrl;
 
+    // Hide all widgets except time, voice visualizer, and tryon-preview
+    document.querySelectorAll('.widget').forEach(el => {
+        if (!el.id.match(/^(time-widget|voice-response|tryon-preview)$/)) {
+            el.style.display = 'none';
+        }
+    });
     document.getElementById("tryon-preview").style.display = "block";
+    // Hide and clear try-on options
+    const tryonOptions = document.getElementById("tryon-options");
+    tryonOptions.style.display = "none";
+    const productOptions = document.getElementById("product-options");
+    if (productOptions) productOptions.innerHTML = '';
 
-    // Optional: auto-hide after 20s
+    // Remove overlay max size restrictions
+    overlay.style.maxWidth = '';
+    overlay.style.maxHeight = '';
+
     setTimeout(() => {
         document.getElementById("tryon-preview").style.display = "none";
+        // Restore all widgets
+        document.querySelectorAll('.widget').forEach(el => {
+            if (!el.id.match(/^(tryon-preview)$/)) {
+                el.style.display = '';
+            }
+        });
+        // Stop webcam stream when hiding
+        if (webcamStream) {
+            webcamStream.getTracks().forEach(track => track.stop());
+            webcamStream = null;
+        }
     }, 20000);
+
+    // Initialize webcam if not already initialized
+    setTimeout(() => {
+        if (!webcamStream) {
+            initializeWebcam();
+        }
+    }, 100);
 }
 
 socket.on("play_audio", (data) => {

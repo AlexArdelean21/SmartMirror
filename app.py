@@ -19,7 +19,7 @@ app = Flask(__name__)
 socketio.init_app(app, cors_allowed_origins="*")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})  # 5-minute cache
 werkzeug_log = logging.getLogger('werkzeug')
-#werkzeug_log.setLevel(logging.WARNING)  # shows errors, needs to be  commented when i want to see endpoint calls
+werkzeug_log.setLevel(logging.WARNING)  # shows errors, needs to be  commented when i want to see endpoint calls
 
 @app.route('/')
 def home():
