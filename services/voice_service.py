@@ -17,6 +17,7 @@ import time
 import os
 import re
 from datetime import datetime, timedelta
+import speech_recognition as sr
 
 # Load environment variables
 load_dotenv()
@@ -36,28 +37,39 @@ FOLLOW_UP_YES = [
 ]
 
 def wake_word_detected():
-    # Detect wake word using Porcupine.
-    access_key = os.getenv("PORCUPINE_ACCESS_KEY")
-    custom_model_path = os.path.join(os.path.dirname(__file__), "../hey_adonis.ppn")
-
-    porcupine = pvporcupine.create(access_key=access_key, keyword_paths=[custom_model_path])
-    recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
-
-    logger.info("Wake word listener started. Listening for 'Hey Adonis'...")
-
+    # Simple wake word detection for testing without Porcupine API key
+    # This will listen for any audio input and treat it as wake word
+    logger.info("Simple wake word detection active - any voice input will trigger")
+    
+    recognizer = sr.Recognizer()
+    
     try:
-        recorder.start()
-        while True:
-            pcm = recorder.read()
-            keyword_index = porcupine.process(pcm)
-            if keyword_index >= 0:
+        with sr.Microphone() as source:
+            logger.info("Listening for wake word... (say anything to activate)")
+            # Adjust for ambient noise
+            recognizer.adjust_for_ambient_noise(source, duration=1)
+            # Listen for any audio input with a short timeout
+            audio = recognizer.listen(source, timeout=1, phrase_time_limit=2)
+            
+            try:
+                # Try to recognize what was said
+                command = recognizer.recognize_google(audio).lower()
+                logger.info(f"Detected speech: '{command}' - treating as wake word")
                 return True
+            except sr.UnknownValueError:
+                # Even if we can't understand it, treat any voice as wake word
+                logger.info("Detected voice input - treating as wake word")
+                return True
+            except sr.RequestError:
+                logger.warning("Speech recognition service error")
+                return False
+                
+    except sr.WaitTimeoutError:
+        # No audio detected, continue listening
+        return False
     except Exception as e:
-        logger.exception(f"Wake word detection failed: {e}")
-    finally:
-        recorder.stop()
-        porcupine.delete()
-        logger.debug("Porcupine recorder stopped and cleaned up.")
+        logger.warning(f"Wake word detection error: {e}")
+        return False
 
 def process_command(command, user_profile=None):
     logger.debug(f"Processing command: {command}")
@@ -116,17 +128,17 @@ def process_command(command, user_profile=None):
         logger.info("Starting face registration process.")
         return add_face_vocally()
 
-    elif "try on" in command or "try a" in command:
-        logger.info("Detected try-on product command.")
-        return handle_tryon_command(command)
-
-    elif "option" in command and "try" in command:
+    elif ("option" in command and any(word in command for word in ["one", "two", "three", "1", "2", "3", "first", "second", "third"])) or ("try" in command and ("the " in command) and any(word in command for word in ["first", "second", "third", "one", "two", "three", "1", "2", "3"])):
         logger.info("Detected option selection command.")
         from services.product_search_service import handle_tryon_selection_command
         return handle_tryon_selection_command(command)
 
+    elif "try on" in command or "try a" in command:
+        logger.info("Detected try-on product command.")
+        return handle_tryon_command(command)
+
     elif "tell me a joke" in command:
-        return "Why don’t skeletons fight each other? They don’t have the guts. "
+        return "Why don't skeletons fight each other? They don't have the guts. "
     else:
         logger.info("Command not recognized. Falling back to GPT.")
         return chat_with_gpt(command)
@@ -331,17 +343,31 @@ def wait_for_wake_and_command():
 
                 logger.info(f"Processing command: {command}")
                 response = process_command(command, current_user_profile)
+                
+                # Check if this was a try-on command that shows options OR a selection command
+                is_tryon_display = ("try on" in command or "try a" in command) and not ("the " in command and any(word in command for word in ["first", "second", "third", "one", "two", "three", "1", "2", "3"]))
+                is_selection_command = ("option" in command and any(word in command for word in ["one", "two", "three", "1", "2", "3", "first", "second", "third"])) or ("try" in command and ("the " in command) and any(word in command for word in ["first", "second", "third", "one", "two", "three", "1", "2", "3"]))
+                
                 if response:
                     speak_response(response)
                 else:
                     logger.warning("TTS response was empty — skipping playback.")
+
+                # Skip immediate follow-up for try-on display commands and selection commands
+                if is_tryon_display:
+                    logger.info("Try-on options displayed - waiting for user selection without immediate follow-up")
+                    continue
+                elif is_selection_command:
+                    logger.info("Selection command processed - skipping follow-up questions")
+                    continue
 
                 while True:
                     time.sleep(2)
                     follow_up = random_phrase(FOLLOW_UP_ASK)
                     speak_response(follow_up)
 
-                    follow_up_command = listen_short_command_with_vosk()
+                    # Use Google STT for follow-up commands since they can be complex
+                    follow_up_command = listen_command()
                     if not follow_up_command or "no command" in follow_up_command:
                         speak_response("I didn't catch that. Please try again.")
                         logger.warning("No follow-up command detected.")

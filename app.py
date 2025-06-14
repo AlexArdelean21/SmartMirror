@@ -19,7 +19,7 @@ app = Flask(__name__)
 socketio.init_app(app, cors_allowed_origins="*")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})  # 5-minute cache
 werkzeug_log = logging.getLogger('werkzeug')
-werkzeug_log.setLevel(logging.WARNING)  # shows errors, needs to be  commented when i want to see endpoint calls
+#werkzeug_log.setLevel(logging.WARNING)  # shows errors, needs to be  commented when i want to see endpoint calls
 
 @app.route('/')
 def home():
@@ -148,6 +148,13 @@ def find_clothing():
         return jsonify({"message": "No matching items found."}), 404
 
     return jsonify(items)
+
+@socketio.on('audio_finished')
+def handle_audio_finished():
+    """Handle audio playback completion signal from frontend"""
+    from util.audio_state import set_audio_playing
+    logger.debug("Audio playback completion signal received from frontend")
+    set_audio_playing(False)
 
 if __name__ == '__main__':
     from services.voice_service import wait_for_wake_and_command

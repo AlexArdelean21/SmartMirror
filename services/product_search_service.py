@@ -1,7 +1,7 @@
 import requests
 from util.logger import logger
 from util.socket_manager import socketio
-from util.voice_utils import speak_response, listen_command, listen_short_command_with_vosk
+from util.voice_utils import speak_response, listen_command
 import re
 import os
 import time
@@ -40,7 +40,7 @@ def get_clothing_items(category="men's clothing", color=None, max_price=None):
         return []
 
 def handle_tryon_command(command):
-    logger.info("Handling try-on voice command.")
+    logger.info(f"Handling try-on voice command: '{command}'")
     category = "men's clothing"
     color = None
     max_price = None
@@ -76,59 +76,51 @@ def handle_tryon_command(command):
         })
         return None
 
+    # Trigger the try-on interface immediately
     socketio.emit("trigger_tryon", {
         "category": category,
         "color": color,
         "max_price": max_price
     })
 
-    speak_response(f"Okay, here are some {color or ''} options. Would you like to try one? You can say yes, no, or wait.")
-
-    while True:
-        response = listen_short_command_with_vosk()
-        logger.info(f"User said (try-on follow-up): {response}")
-
-        rejections = ["no", "nothing", "not now", "skip", "stop", "cancel", "i'm good", "i'm fine"]
-        holds = ["wait", "hold", "not yet", "later", "give me time", "not right now"]
-
-        if any(phrase in response for phrase in rejections):
-            speak_response("Alright. Just say 'Hey Adonis' when you're ready again.")
-            return None
-
-        if any(phrase in response for phrase in holds):
-            speak_response("Okay, I'll check back in 20 seconds.")
-            time.sleep(20)
-            speak_response("Would you like to try one now?")
-            continue
-
-        selection_response = handle_tryon_selection_command(response)
-
-        if "didn't understand" in selection_response.lower():
-            speak_response(selection_response)
-            speak_response("Please say option one, two, or three.")
-            continue
-
-        return selection_response
-
+    # Provide clear instructions for selection - single response only
+    color_text = f"{color} " if color else ""
+    speak_response(f"Here are some {color_text}options! Say 'try on the first one', 'try on the second one', or 'try on the third one' to select.")
+    
+    return None  # Don't return text response to avoid duplicate TTS
 
 def handle_tryon_selection_command(command):
-    logger.info("Handling try-on selection voice command.")
+    logger.info(f"Handling try-on selection voice command: '{command}'")
     from util.socket_manager import socketio
 
     index = None
     command = command.lower()
-
-    if "option 1" in command or "first" in command:
+    
+    # More specific pattern matching to avoid conflicts
+    if "first" in command or "option 1" in command or " 1" in command:
         index = 0
-    elif "option 2" in command or "second" in command:
+    elif "second" in command or "option 2" in command or " 2" in command:
         index = 1
-    elif "option 3" in command or "third" in command:
+    elif "third" in command or "option 3" in command or " 3" in command:
         index = 2
+    
+    # Fallback: try to extract numbers with regex
+    if index is None:
+        import re
+        number_match = re.search(r'\b(1|2|3|one|two|three)\b', command)
+        if number_match:
+            number_word = number_match.group(1)
+            number_mapping = {
+                '1': 0, 'one': 0,
+                '2': 1, 'two': 1,
+                '3': 2, 'three': 2
+            }
+            index = number_mapping.get(number_word)
 
     if index is not None:
-        logger.info(f"Emitting try-on selection: option {index}")
+        logger.info(f"Emitting try-on selection: option {index + 1}")
         socketio.emit("try_on_selected_item", {"index": index})
         return f"Trying on option {index + 1}."
     else:
-        logger.warning("Couldn't determine which option to try.")
-        return "I didn't understand which option to try. Please say option one, two, or three."
+        logger.warning(f"Couldn't determine which option to try from command: '{command}'")
+        return "I didn't understand which option to try. Please say something like 'try on the first one' or 'option two'."

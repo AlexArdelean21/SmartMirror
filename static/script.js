@@ -158,6 +158,28 @@ function playSpeechAudio(audioUrl) {
     }
     voiceBox.classList.add('speaking');
     let animationFrameId;
+    
+    // Add audio completion handlers
+    audio.addEventListener('ended', () => {
+        console.log('Audio playback completed');
+        socket.emit('audio_finished');
+        voiceBox.classList.remove('speaking');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+        }
+    });
+    
+    audio.addEventListener('error', (e) => {
+        console.error('Audio playback error:', e);
+        socket.emit('audio_finished');
+        voiceBox.classList.remove('speaking');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+        }
+    });
+    
     function drawSineWave() {
         analyser.getByteTimeDomainData(dataArray);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -183,14 +205,19 @@ function playSpeechAudio(audioUrl) {
         } else {
             voiceBox.classList.remove('speaking');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            cancelAnimationFrame(animationFrameId);
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
         }
     }
     audio.play()
         .then(() => {
             drawSineWave();
         })
-        .catch(error => {});
+        .catch(error => {
+            console.error('Audio play failed:', error);
+            socket.emit('audio_finished');
+        });
 }
 
 document.getElementById('audio-init-button').addEventListener('click', () => {
@@ -343,57 +370,119 @@ function updateOverlayPosition(pose) {
     const video = document.getElementById('webcam-feed');
     if (!overlay || !video) return;
 
-    // DEBUG: Log all keypoints
-    if (pose && pose.keypoints) {
-        console.log('Pose keypoints:', pose.keypoints);
-    }
-
     // Support both snake_case and camelCase keypoint names
     function getKeypoint(name1, name2) {
         return pose.keypoints.find(kp => kp.name === name1 || kp.name === name2);
     }
+    
     const leftShoulder = getKeypoint('left_shoulder', 'leftShoulder');
     const rightShoulder = getKeypoint('right_shoulder', 'rightShoulder');
     const leftHip = getKeypoint('left_hip', 'leftHip');
     const rightHip = getKeypoint('right_hip', 'rightHip');
+    const nose = getKeypoint('nose', 'nose');
 
-    if (leftShoulder && rightShoulder && leftHip && rightHip) {
-        // Calculate chest center
-        const centerX = (leftShoulder.x + rightShoulder.x) / 2;
-        const centerY = (leftShoulder.y + rightShoulder.y) / 2;
-        // Calculate width (shoulder to shoulder)
-        const shoulderDist = Math.abs(rightShoulder.x - leftShoulder.x);
-        // Calculate height (shoulder to hip average)
+    if (leftShoulder && rightShoulder && leftHip && rightHip && 
+        leftShoulder.score > 0.5 && rightShoulder.score > 0.5) {
+        
+        // Calculate body measurements
+        const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+        const shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
+        const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+        
+        // Calculate torso height (shoulder to hip)
         const avgHipY = (leftHip.y + rightHip.y) / 2;
-        const chestHeight = avgHipY - centerY;
-        // Scaling factors for realism
-        const width = shoulderDist * 1.35; // even wider for realism
-        const height = chestHeight * 1.3;  // even longer for realism
-        // Position overlay so it's centered horizontally and starts at shoulders
+        const torsoHeight = avgHipY - shoulderCenterY;
+        
+        // Improved sizing for clothing
+        const clothingWidth = shoulderWidth * 1.8;  // More realistic width
+        const clothingHeight = torsoHeight * 1.6;   // Extended height for full garment
+        
+        // Position clothing to start slightly above shoulders for better fit
+        const clothingTop = shoulderCenterY - (clothingHeight * 0.1); // Start 10% above calculated position
+        const clothingLeft = shoulderCenterX - (clothingWidth / 2);
+        
+        // Apply positioning with smooth transitions
         overlay.style.position = 'absolute';
-        overlay.style.left = `${centerX - width / 2}px`;
-        overlay.style.top = `${centerY}px`;
-        overlay.style.width = `${width}px`;
-        overlay.style.height = `${height}px`;
-        overlay.style.maxWidth = '';
-        overlay.style.maxHeight = '';
-        overlay.style.transform = '';
+        overlay.style.left = `${clothingLeft}px`;
+        overlay.style.top = `${clothingTop}px`;
+        overlay.style.width = `${clothingWidth}px`;
+        overlay.style.height = `${clothingHeight}px`;
+        overlay.style.maxWidth = 'none';
+        overlay.style.maxHeight = 'none';
+        overlay.style.transform = 'none';
+        overlay.style.transition = 'all 0.1s ease-out';
+        
+        console.log(`Clothing positioned: ${clothingWidth.toFixed(0)}x${clothingHeight.toFixed(0)} at (${clothingLeft.toFixed(0)}, ${clothingTop.toFixed(0)})`);
+        
     } else {
-        // Fallback: center overlay
+        // Fallback positioning when pose detection is poor
+        console.log('Using fallback positioning - pose detection confidence too low');
         overlay.style.position = 'absolute';
         overlay.style.left = '50%';
-        overlay.style.top = '50%';
+        overlay.style.top = '40%'; // Slightly higher than center for clothing
         overlay.style.transform = 'translate(-50%, -50%)';
-        overlay.style.width = '80%';
-        overlay.style.height = '80%';
-        overlay.style.maxWidth = '';
-        overlay.style.maxHeight = '';
+        overlay.style.width = '70%';  // Smaller fallback size
+        overlay.style.height = '60%';
+        overlay.style.maxWidth = 'none';
+        overlay.style.maxHeight = 'none';
+        overlay.style.transition = 'all 0.3s ease-out';
     }
 }
 
 function showStaticOverlay(imageUrl) {
     const overlay = document.getElementById("overlay-item");
-    overlay.src = imageUrl;
+    
+    // Create a new image to process
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    
+    img.onload = function() {
+        // Create canvas to process the image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        // Draw the image
+        ctx.drawImage(img, 0, 0);
+        
+        // Get image data to remove white background
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // Remove white/light backgrounds (make them transparent)
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            // If pixel is close to white/light gray, make it transparent
+            if (r > 240 && g > 240 && b > 240) {
+                data[i + 3] = 0; // Set alpha to 0 (transparent)
+            }
+        }
+        
+        // Put the processed image data back
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Set the processed image as overlay source
+        overlay.src = canvas.toDataURL();
+        
+        // Apply better styling for clothing overlay
+        overlay.style.mixBlendMode = 'multiply';
+        overlay.style.filter = 'contrast(1.1) saturate(1.2)';
+        overlay.style.opacity = '0.9';
+    };
+    
+    // Fallback: use original image if processing fails
+    img.onerror = function() {
+        overlay.src = imageUrl;
+        overlay.style.mixBlendMode = 'normal';
+        overlay.style.filter = 'none';
+        overlay.style.opacity = '0.8';
+    };
+    
+    img.src = imageUrl;
 
     // Hide all widgets except time, voice visualizer, and tryon-preview
     document.querySelectorAll('.widget').forEach(el => {
@@ -402,15 +491,17 @@ function showStaticOverlay(imageUrl) {
         }
     });
     document.getElementById("tryon-preview").style.display = "block";
+    
     // Hide and clear try-on options
     const tryonOptions = document.getElementById("tryon-options");
     tryonOptions.style.display = "none";
     const productOptions = document.getElementById("product-options");
     if (productOptions) productOptions.innerHTML = '';
 
-    // Remove overlay max size restrictions
+    // Remove overlay max size restrictions for better fitting
     overlay.style.maxWidth = '';
     overlay.style.maxHeight = '';
+    overlay.style.objectFit = 'contain';
 
     setTimeout(() => {
         document.getElementById("tryon-preview").style.display = "none";
@@ -425,6 +516,10 @@ function showStaticOverlay(imageUrl) {
             webcamStream.getTracks().forEach(track => track.stop());
             webcamStream = null;
         }
+        // Reset overlay styles
+        overlay.style.mixBlendMode = 'normal';
+        overlay.style.filter = 'none';
+        overlay.style.opacity = '1';
     }, 20000);
 
     // Initialize webcam if not already initialized
@@ -467,7 +562,11 @@ socket.on("trigger_tryon", (data) => {
         return;
     }
 
-    socket.on("try_on_selected_item", ({ index }) => {
+    const { category, color, max_price } = data;
+    showTryOnOptions(category, color, max_price);
+});
+
+socket.on("try_on_selected_item", ({ index }) => {
     console.log("Selected item index:", index);
 
     const item = currentTryOnItems[index];
@@ -477,12 +576,6 @@ socket.on("trigger_tryon", (data) => {
         console.warn("No item found for selected index:", index);
     }
 });
-
-    const { category, color, max_price } = data;
-    showTryOnOptions(category, color, max_price);
-});
-
-
 
 // Schedule updates
 updateTimeAndDate();
