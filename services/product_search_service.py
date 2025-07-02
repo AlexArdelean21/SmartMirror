@@ -5,6 +5,7 @@ from util.voice_utils import speak_response, listen_command
 import re
 import os
 import time
+from util.image_utils import remove_background
 
 FAKESTORE_API = os.getenv("FAKESTORE_API")
 
@@ -29,6 +30,7 @@ def get_clothing_items(category="men's clothing", color=None, max_price=None):
                 "title": item["title"],
                 "price": item["price"],
                 "image_url": item["image"],
+                "processed_image_url": remove_background(item["image"]),
                 "id": item["id"]
             })
 

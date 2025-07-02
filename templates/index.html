@@ -43,7 +43,9 @@
     <div id="tryon-preview" class="widget double-span" style="display: none;">
         <h3>Virtual Try-On</h3>
         <div id="overlay-frame">
-            <img id="overlay-item" src="" alt="Overlay clothing" />
+            <video id="webcam" autoplay playsinline style="display: none;"></video>
+            <canvas id="live-canvas" class="live-canvas"></canvas>
+            <img id="overlay-item" src="" alt="Overlay clothing" style="display: none;" />
     </div>
 </div>
 
@@ -59,6 +61,9 @@
 
 </div>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <script src="static/script.js"></script>
 </body>
 

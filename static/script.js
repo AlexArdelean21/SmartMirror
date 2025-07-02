@@ -4,6 +4,7 @@ let previousCrypto = "";
 let previousCalendar = "";
 const socket = io();
 let currentTryOnItems = [];
+let liveTryOn = null; // To hold our live try-on instance
 
 // Update Time and Date
 function updateTimeAndDate() {
@@ -315,18 +316,29 @@ function toggleWidgetsVisibility(showTryOn = true) {
     if (tryOnWidget) {
         tryOnWidget.style.display = showTryOn ? 'block' : 'none';
     }
+
+    // Also handle the live preview
+    const tryOnPreview = document.getElementById('tryon-preview');
+    if (tryOnPreview) {
+        tryOnPreview.style.display = showTryOn ? 'block' : 'none';
+        if (showTryOn && !liveTryOn) {
+            // Start the live session when the widgets are first shown
+            liveTryOn = new LiveTryOn();
+        } else if (!showTryOn && liveTryOn) {
+            // Stop the live session when hidden
+            liveTryOn.stop();
+            liveTryOn = null;
+        }
+    }
 }
 
 function showStaticOverlay(imageUrl) {
-    const overlay = document.getElementById("overlay-item");
-    overlay.src = imageUrl;
-
-    document.getElementById("tryon-preview").style.display = "block";
-
-    // Optional: auto-hide after 20s
-    setTimeout(() => {
-        document.getElementById("tryon-preview").style.display = "none";
-    }, 20000);
+    if (liveTryOn) {
+        document.getElementById("tryon-preview").style.display = "block";
+        liveTryOn.setOverlay(imageUrl);
+    } else {
+        console.error("Live Try-On not initialized.");
+    }
 }
 
 socket.on("play_audio", (data) => {
@@ -366,7 +378,7 @@ socket.on("trigger_tryon", (data) => {
 
     const item = currentTryOnItems[index];
     if (item) {
-        showStaticOverlay(item.image_url);
+        showStaticOverlay(item.processed_image_url);
     } else {
         console.warn("No item found for selected index:", index);
     }
@@ -376,7 +388,118 @@ socket.on("trigger_tryon", (data) => {
     showTryOnOptions(category, color, max_price);
 });
 
+class LiveTryOn {
+    constructor() {
+        this.videoElement = document.getElementById("webcam");
+        this.canvasElement = document.getElementById("live-canvas");
+        this.canvasCtx = this.canvasElement.getContext("2d");
+        this.overlayImage = new Image();
+        this.overlayImage.style.display = 'none'; // Keep it out of the DOM flow
 
+        this.pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+        });
+
+        this.pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+        });
+
+        this.pose.onResults(this.onPoseResults.bind(this));
+
+        this.camera = new Camera(this.videoElement, {
+            onFrame: async () => {
+                await this.pose.send({ image: this.videoElement });
+            },
+            width: 640,
+            height: 480,
+        });
+
+        this.camera.start();
+        console.log("Live Try-On session started.");
+    }
+
+    setOverlay(imageUrl) {
+        if (imageUrl) {
+            this.overlayImage.src = imageUrl;
+            this.overlayImage.style.display = 'block';
+        } else {
+            this.overlayImage.src = '';
+            this.overlayImage.style.display = 'none';
+        }
+    }
+
+    onPoseResults(results) {
+        this.canvasCtx.save();
+        this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+        this.canvasCtx.drawImage(results.image, 0, 0, this.canvasElement.width, this.canvasElement.height);
+
+        if (results.poseLandmarks && this.overlayImage.src) {
+            this.drawOverlay(results.poseLandmarks);
+        }
+
+        this.canvasCtx.restore();
+    }
+
+    drawOverlay(landmarks) {
+        const leftShoulder = landmarks[11];
+        const rightShoulder = landmarks[12];
+        const leftHip = landmarks[23];
+        const rightHip = landmarks[24];
+
+        if (leftShoulder.visibility < 0.7 || rightShoulder.visibility < 0.7 ||
+            leftHip.visibility < 0.7 || rightHip.visibility < 0.7) {
+            return; // Not enough landmarks are visible
+        }
+
+        // --- All coordinates are in normalized screen space (0.0 - 1.0) ---
+        const canvasWidth = this.canvasElement.width;
+        const canvasHeight = this.canvasElement.height;
+
+        // Calculate torso center
+        const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+        const hipCenterX = (leftHip.x + rightHip.x) / 2;
+        const torsoCenterY = (leftShoulder.y + rightHip.y) / 2;
+        
+        // Calculate width and height based on torso
+        const torsoWidth = Math.abs(leftShoulder.x - rightShoulder.x) * canvasWidth;
+        const torsoHeight = Math.abs(leftShoulder.y - leftHip.y) * canvasHeight;
+
+        // Add padding to make the clothing item look natural
+        const widthPadding = 1.8; // Adjust this factor as needed
+        const itemWidth = torsoWidth * widthPadding;
+        const itemHeight = torsoHeight * 1.1; // Slightly longer than torso
+
+        // Calculate rotation based on shoulder angle, and add PI to correct the inversion
+        const angle = Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x) + Math.PI;
+
+        // --- Drawing on Canvas ---
+        this.canvasCtx.save();
+        // Translate and rotate canvas to draw the image
+        this.canvasCtx.translate(shoulderCenterX * canvasWidth, torsoCenterY * canvasHeight);
+        this.canvasCtx.rotate(angle);
+
+        // Draw the image centered on the new, rotated origin
+        this.canvasCtx.drawImage(
+            this.overlayImage,
+            -itemWidth / 2,
+            -itemHeight / 2,
+            itemWidth,
+            itemHeight
+        );
+
+        this.canvasCtx.restore();
+    }
+
+    stop() {
+        this.camera.stop();
+        this.pose.close();
+        console.log("Live Try-On session stopped.");
+    }
+}
 
 // Schedule updates
 updateTimeAndDate();

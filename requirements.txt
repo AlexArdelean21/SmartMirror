@@ -1,0 +1,11 @@
+flask
+python-dotenv
+SpeechRecognition
+pvporcupine
+pyaudio
+google-cloud-texttospeech
+openai
+requests
+rembg
+pillow
+numpy 
