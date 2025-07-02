@@ -340,19 +340,27 @@ def wait_for_wake_and_command():
                         logger.warning("No follow-up command detected.")
                         continue
 
+                    # Check if user wants to end session
                     if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]):
                         speak_response("Alright, see you later.")
                         logger.info("Follow-up session ended.")
                         session_active = False
                         break
 
+                    # Check if user just says yes (continue to new command)
                     if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]):
                         speak_response(random_phrase(FOLLOW_UP_YES))
                         logger.info("Follow-up accepted, awaiting new command...")
                         break
 
-                    speak_response("I didn't understand that. Can you repeat?")
-                    logger.warning("Unrecognized follow-up command.")
+                    # Treat anything else as a direct command
+                    logger.info(f"Processing direct follow-up command: {follow_up_command}")
+                    response = process_command(follow_up_command, current_user_profile)
+                    if response:
+                        speak_response(response)
+                    else:
+                        logger.warning("TTS response was empty — skipping playback.")
+                    # Continue the follow-up loop to ask "Anything else?" again
 
 
 def chat_with_gpt(prompt):

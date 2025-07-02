@@ -19,7 +19,7 @@ app = Flask(__name__)
 socketio.init_app(app, cors_allowed_origins="*")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})  # 5-minute cache
 werkzeug_log = logging.getLogger('werkzeug')
-werkzeug_log.setLevel(logging.WARNING)  # shows errors, needs to be  commented when i want to see endpoint calls
+#werkzeug_log.setLevel(logging.WARNING)  # shows errors, needs to be  commented when i want to see endpoint calls
 
 @app.route('/')
 def home():
@@ -148,6 +148,13 @@ def find_clothing():
         return jsonify({"message": "No matching items found."}), 404
 
     return jsonify(items)
+
+@app.route('/test_tts')
+def test_tts():
+    """Test route to directly test text-to-speech"""
+    from util.voice_utils import speak_response
+    speak_response("Hello! This is a test of the text to speech system.")
+    return jsonify({"message": "TTS test triggered"})
 
 if __name__ == '__main__':
     from services.voice_service import wait_for_wake_and_command
