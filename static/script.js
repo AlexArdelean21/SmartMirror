@@ -290,11 +290,14 @@ function showTryOnOptions(category = "men's clothing", color = null, max_price =
                 container.appendChild(card);
             });
 
-            document.getElementById("tryon-options").style.display = "block";
-            toggleWidgetsVisibility(true);
+            toggleWidgetsVisibility(true, false); // Show options, hide preview
+
             setTimeout(() => {
-                toggleWidgetsVisibility(false);
-                console.log("Auto-hide triggered: try-on options removed after 20s.");
+                const tryOnOptions = document.getElementById('tryon-options');
+                if (tryOnOptions.style.display === 'block') {
+                    toggleWidgetsVisibility(false, false);
+                    console.log("Auto-hide triggered: try-on options removed after 30s.");
+                }
             }, 30000); // 30 seconds
 
         })
@@ -302,42 +305,31 @@ function showTryOnOptions(category = "men's clothing", color = null, max_price =
 }
 
 
-function toggleWidgetsVisibility(showTryOn = true) {
+function toggleWidgetsVisibility(showOptions, showPreview) {
     const widgetsToToggle = ['weather', 'news', 'crypto', 'calendar'];
+    const shouldHideWidgets = showOptions || showPreview;
 
     widgetsToToggle.forEach(id => {
         const element = document.getElementById(id);
         if (element) {
-            element.style.display = showTryOn ? 'none' : 'flex';
+            element.style.display = shouldHideWidgets ? 'none' : 'flex';
         }
     });
 
     const tryOnWidget = document.getElementById('tryon-options');
     if (tryOnWidget) {
-        tryOnWidget.style.display = showTryOn ? 'block' : 'none';
+        tryOnWidget.style.display = showOptions ? 'block' : 'none';
     }
 
-    // Also handle the live preview
     const tryOnPreview = document.getElementById('tryon-preview');
     if (tryOnPreview) {
-        tryOnPreview.style.display = showTryOn ? 'block' : 'none';
-        if (showTryOn && !liveTryOn) {
-            // Start the live session when the widgets are first shown
+        tryOnPreview.style.display = showPreview ? 'block' : 'none';
+        if (showPreview && !liveTryOn) {
             liveTryOn = new LiveTryOn();
-        } else if (!showTryOn && liveTryOn) {
-            // Stop the live session when hidden
+        } else if (!showPreview && liveTryOn) {
             liveTryOn.stop();
             liveTryOn = null;
         }
-    }
-}
-
-function showStaticOverlay(imageUrl) {
-    if (liveTryOn) {
-        document.getElementById("tryon-preview").style.display = "block";
-        liveTryOn.setOverlay(imageUrl);
-    } else {
-        console.error("Live Try-On not initialized.");
     }
 }
 
@@ -363,7 +355,7 @@ socket.on("trigger_tryon", (data) => {
     console.log("Try-on trigger received:", data);
 
     if (!data.category) {
-        toggleWidgetsVisibility(false);
+        toggleWidgetsVisibility(false, false);
         document.getElementById("product-options").innerHTML = `
             <span style="color:white;">No matching items found.</span>
         `;
@@ -374,15 +366,20 @@ socket.on("trigger_tryon", (data) => {
     }
 
     socket.on("try_on_selected_item", ({ index }) => {
-    console.log("Selected item index:", index);
+        console.log("Selected item index:", index);
 
-    const item = currentTryOnItems[index];
-    if (item) {
-        showStaticOverlay(item.processed_image_url);
-    } else {
-        console.warn("No item found for selected index:", index);
-    }
-});
+        const item = currentTryOnItems[index];
+        if (item) {
+            toggleWidgetsVisibility(false, true); // Hide options, show preview
+            if (liveTryOn) {
+                liveTryOn.setOverlay(item.processed_image_url);
+            } else {
+                console.error("Live Try-On not initialized, but it should be.");
+            }
+        } else {
+            console.warn("No item found for selected index:", index);
+        }
+    });
 
     const { category, color, max_price } = data;
     showTryOnOptions(category, color, max_price);
