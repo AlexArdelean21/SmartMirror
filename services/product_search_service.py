@@ -2,6 +2,7 @@ import requests
 from util.logger import logger
 from util.socket_manager import socketio
 from util.voice_utils import speak_response, listen_command
+from util.session_state import set_session_attribute, clear_session_attribute
 import re
 import os
 import time
@@ -79,7 +80,15 @@ def handle_tryon_command(command):
         "items": items 
     })
     
+    set_session_attribute('tryon_active', True)
     return f"Okay, I found a few {color or ''} options for you. Let me know which one you'd like to try."
+
+def handle_tryon_dismissal():
+    """Emits an event to hide the try-on UI and clears the context."""
+    logger.info("Hiding try-on items display.")
+    socketio.emit("hide_tryon")
+    clear_session_attribute('tryon_active')
+    return "No problem. I've cleared them. Is there anything else I can help with?"
 
 def handle_tryon_selection_command(command):
     logger.info("Handling try-on selection voice command.")
@@ -98,6 +107,7 @@ def handle_tryon_selection_command(command):
     if index is not None:
         logger.info(f"Emitting try-on selection: option {index}")
         socketio.emit("try_on_selected_item", {"index": index})
+        clear_session_attribute('tryon_active')
         return f"Trying on option {index + 1}."
     else:
         logger.warning("Couldn't determine which option to try.")

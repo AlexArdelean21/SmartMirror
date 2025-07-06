@@ -5,7 +5,7 @@ from services.crypto_service import get_crypto_prices
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally, load_known_faces
 from services.user_profile_service import get_user_profile, create_profile_interactively
 from services.product_search_service import handle_tryon_command
-from util.session_state import set_active_profile
+from util.session_state import set_active_profile, get_session_attribute
 import pvporcupine
 from pvrecorder import PvRecorder
 from util.voice_utils import speak_response, listen_command
@@ -115,14 +115,20 @@ def process_command(command, user_profile=None):
         logger.info("Starting face registration process.")
         return add_face_vocally()
 
-    elif "try on" in command or "try a" in command:
-        logger.info("Detected try-on product command.")
-        return handle_tryon_command(command)
+    # Check for dismissal before selection to catch negative responses.
+    elif get_session_attribute('tryon_active') and any(keyword in command for keyword in ["none", "neither", "don't like", "dislike", "not these"]):
+        logger.info("User dismissed try-on options.")
+        from services.product_search_service import handle_tryon_dismissal
+        return handle_tryon_dismissal()
 
     elif any(keyword in command for keyword in ["try option", "select option", "first one", "second one", "third one"]):
         logger.info("Detected option selection command.")
         from services.product_search_service import handle_tryon_selection_command
         return handle_tryon_selection_command(command)
+
+    elif "try on" in command or "try a" in command:
+        logger.info("Detected try-on product command.")
+        return handle_tryon_command(command)
 
     else:
         logger.info("Command not recognized. Falling back to GPT.")
@@ -293,6 +299,12 @@ def wait_for_wake_and_command():
                     speak_response(response)
                 else:
                     logger.warning("No response generated for the command.")
+
+                # If the command was a successful try-on search, the response already asks for a selection.
+                # We should immediately listen for the user's choice instead of asking a generic follow-up.
+                is_tryon_search = "try on" in command or "try a" in command
+                if is_tryon_search and response and "Sorry" not in response:
+                    continue
                 
                 time.sleep(1)
                 speak_response(random_phrase(FOLLOW_UP_ASK))
