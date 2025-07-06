@@ -392,6 +392,7 @@ class LiveTryOn {
         this.canvasCtx = this.canvasElement.getContext("2d");
         this.overlayImage = new Image();
         this.overlayImage.style.display = 'none'; // Keep it out of the DOM flow
+        this.timeoutId = null; 
 
         this.pose = new Pose({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
@@ -416,13 +417,25 @@ class LiveTryOn {
         });
 
         this.camera.start();
+        this.startCloseTimer();
         console.log("Live Try-On session started.");
+    }
+
+    startCloseTimer() {
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+        }
+        this.timeoutId = setTimeout(() => {
+            console.log("Auto-closing try-on session after 20 seconds of inactivity.");
+            toggleWidgetsVisibility(false, false);
+        }, 20000); // 20 seconds
     }
 
     setOverlay(imageUrl) {
         if (imageUrl) {
             this.overlayImage.src = imageUrl;
             this.overlayImage.style.display = 'block';
+            this.startCloseTimer(); 
         } else {
             this.overlayImage.src = '';
             this.overlayImage.style.display = 'none';
@@ -492,6 +505,9 @@ class LiveTryOn {
     }
 
     stop() {
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+        }
         this.camera.stop();
         this.pose.close();
         console.log("Live Try-On session stopped.");

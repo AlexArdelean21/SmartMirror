@@ -70,37 +70,16 @@ def handle_tryon_command(command):
     if not items:
         response_text = f"Sorry, I couldn't find any {color or ''} items in that category."
         logger.info(f"No clothing items matched: {category}, {color}, {max_price}")
-        speak_response(response_text)
-
-        # Optional: emit cleanup event if needed
-        socketio.emit("trigger_tryon", {
-            "category": None,
-            "color": None,
-            "max_price": None
-        })
-        return None  # <- Prevents follow-up TTS
+        return response_text
 
     socketio.emit("trigger_tryon", {
         "category": category,
         "color": color,
-        "max_price": max_price
+        "max_price": max_price,
+        "items": items 
     })
-
-    speak_response(f"Okay, here are some {color or ''} options. Would you like to try one?")
-
-    response = listen_command()
-
-    if any(word in response for word in ["no", "nothing", "not now", "skip"]):
-        speak_response("Alright. Just say 'Hey Adonis' when you're ready again.")
-        return None
-
-    elif any(word in response for word in ["wait", "hold", "not yet", "later"]):
-        speak_response("Okay, I'll check back in 20 seconds.")
-        time.sleep(20)
-        speak_response("Would you like to try one of them now?")
-        response = listen_command()
-
-    return handle_tryon_selection_command(response)
+    
+    return f"Okay, I found a few {color or ''} options for you. Let me know which one you'd like to try."
 
 def handle_tryon_selection_command(command):
     logger.info("Handling try-on selection voice command.")

@@ -119,7 +119,7 @@ def process_command(command, user_profile=None):
         logger.info("Detected try-on product command.")
         return handle_tryon_command(command)
 
-    elif "option" in command and "try" in command:
+    elif any(keyword in command for keyword in ["try option", "select option", "first one", "second one", "third one"]):
         logger.info("Detected option selection command.")
         from services.product_search_service import handle_tryon_selection_command
         return handle_tryon_selection_command(command)
@@ -208,7 +208,6 @@ def wait_for_wake_and_command():
                 last_recognition_time = current_time
                 logger.info(f"Recognized user: {user_name}")
 
-                # Ghost = No profile, no session
                 if user_name == "ghost":
                     logger.info("No face detected. Restarting loop.")
                     speak_response("Maybe I'm hearing things!")
@@ -216,12 +215,12 @@ def wait_for_wake_and_command():
 
                 known_faces = load_known_faces()
 
-                # Handle "Unknown" face
                 if user_name == "Unknown":
                     speak_response("I don't recognize you. Would you like to register?")
                     user_response = listen_command()
+                    user_response = user_response.lower() if user_response else ""
 
-                    if any(word in user_response.lower() for word in ["yes", "sure", "okay", "yeah"]):
+                    if any(word in user_response for word in ["yes", "sure", "okay", "yeah"]):
                         speak_response("Please state your name clearly.")
                         user_name = listen_command()
 
@@ -230,138 +229,73 @@ def wait_for_wake_and_command():
                             logger.warning(f"Registration blocked — name already taken: {user_name}")
                             continue
 
-                        if user_name != "Unknown":
+                        if user_name and user_name != "Unknown":
                             speak_response(f"Registering {user_name}. Please look at the camera.")
                             add_face_vocally(user_name)
                             speak_response(f"Face registered successfully. Hello {user_name}!")
-
-                            # Setup profile
+                            
                             profile = create_profile_interactively(user_name)
                             current_user_profile = profile
                             set_active_profile(profile)
                             logger.info(f"New user registered and profile saved: {user_name}")
+                        else:
+                            speak_response("I didn't catch a name. We can try again later.")
+                            continue
                     else:
                         speak_response("Alright. You can use the mirror with limited access.")
                         user_name = "unknown"
-                        profile = get_user_profile("unknown")
-
-                        if not profile:
-                            logger.warning("Fallback 'unknown' profile not found. Using inline default.")
-                            profile = {
-                                "name": "Unknown",
-                                "preferences": {
-                                    "location": "Bucharest",
-                                    "language": "en",
-                                    "theme": "dark",
-                                    "news_topics": ["technology", "world"]
-                                }
-                            }
-                        current_user_profile = profile
-                        set_active_profile(profile)
-                        logger.info(f"'Unknown' profile used for unregistered user.")
+                        current_user_profile = get_user_profile("unknown")
+                        set_active_profile(current_user_profile)
+                        logger.info("'Unknown' profile used for unregistered user.")
                 else:
-                    # Recognized face
+                    # Recognized a known face
                     profile = get_user_profile(user_name)
                     if not profile:
                         speak_response(f"I don't have a profile for you, {user_name}. Would you like to create one?")
-                        answer = listen_command()
-
-                        if any(word in answer.lower() for word in ["yes", "sure", "okay", "yeah"]):
+                        answer = listen_command().lower()
+                        if any(word in answer for word in ["yes", "sure", "okay", "yeah"]):
                             profile = create_profile_interactively(user_name)
-                            logger.info(f"New profile created interactively for: {user_name}")
+                            logger.info(f"New profile created for: {user_name}")
                         else:
-                            profile = get_user_profile("unknown")
-                            if not profile:
-                                logger.warning("Fallback 'unknown' profile not found. Using inline default.")
-                                profile = {
-                                    "name": "Unknown",
-                                    "preferences": {
-                                        "location": "Bucharest",
-                                        "language": "en",
-                                        "theme": "dark",
-                                        "news_topics": ["technology", "world"]
-                                    }
-                                }
-                            logger.info(f"'Unknown' default profile loaded for user: {user_name}")
-
+                            profile = get_user_profile("unknown") # Fallback
+                            logger.info(f"User {user_name} declined profile creation, using 'unknown'.")
+                    
                     current_user_profile = profile
                     set_active_profile(profile)
-                    speak_response(f"Hello {user_name}, would you like to start a session?")
+                    speak_response(f"Hello {user_name}, ready to start?")
 
-                    confirmation = listen_command()
-                    confirmation = confirmation.lower() if confirmation else ""
-
-                    if any(word in confirmation for word in ["no", "not now", "later", "stop", "maybe later"]):
+                    confirmation = listen_command().lower()
+                    if any(word in confirmation for word in ["no", "not now", "later", "stop"]):
                         speak_response("Alright, I'll be here if you need me.")
-                        logger.info("Session declined by user.")
                         continue
-
-                    elif any(word in confirmation for word in
-                             ["yes", "sure", "okay", "yeah", "yep", "yes please", "alright"]):
-                        speak_response("Great, let's begin.")
-                        logger.info("Session confirmed by user.")
-
-                    else:
-                        speak_response("I wasn't sure what you meant, so I'll take that as a yes.")
-                        logger.info("Unclear confirmation — proceeding with session.")
-
+            
+            # Session starts here
             session_active = True
-            while session_active:
-                if user_name == "ghost":
-                    logger.info("Session interrupted — no face.")
-                    break
+            speak_response(random_phrase(FOLLOW_UP_YES))
 
+            while session_active:
                 command = listen_command()
+                command = command.lower() if command else ""
+
                 if not command or "no command" in command:
-                    logger.warning("No command detected. Asking user to repeat.")
-                    speak_response("I didn't catch that. Please repeat.")
+                    speak_response("I didn't catch that. Could you repeat?")
                     continue
 
-                if any(phrase in command for phrase in ["no", "that's all", "stop", "nothing"]):
+                if any(phrase in command for phrase in ["no thanks", "that's all", "stop", "nothing", "goodbye"]):
                     speak_response("Alright, see you later.")
                     logger.info("Session ended by user.")
-                    break
+                    session_active = False
+                    continue
 
                 logger.info(f"Processing command: {command}")
                 response = process_command(command, current_user_profile)
                 if response:
                     speak_response(response)
                 else:
-                    logger.warning("TTS response was empty — skipping playback.")
-
-                while True:
-                    time.sleep(2)
-                    follow_up = random_phrase(FOLLOW_UP_ASK)
-                    speak_response(follow_up)
-
-                    follow_up_command = listen_command()
-                    if not follow_up_command or "no command" in follow_up_command:
-                        speak_response("I didn't understand that. Can you repeat?")
-                        logger.warning("No follow-up command detected.")
-                        continue
-
-                    # Check if user wants to end session
-                    if any(phrase in follow_up_command for phrase in ["no", "that's all", "stop", "nothing"]):
-                        speak_response("Alright, see you later.")
-                        logger.info("Follow-up session ended.")
-                        session_active = False
-                        break
-
-                    # Check if user just says yes (continue to new command)
-                    if any(phrase in follow_up_command for phrase in ["yes", "sure", "yea", "yeah", "yep"]):
-                        speak_response(random_phrase(FOLLOW_UP_YES))
-                        logger.info("Follow-up accepted, awaiting new command...")
-                        break
-
-                    # Treat anything else as a direct command
-                    logger.info(f"Processing direct follow-up command: {follow_up_command}")
-                    response = process_command(follow_up_command, current_user_profile)
-                    if response:
-                        speak_response(response)
-                    else:
-                        logger.warning("TTS response was empty — skipping playback.")
-                    # Continue the follow-up loop to ask "Anything else?" again
-
+                    logger.warning("No response generated for the command.")
+                
+                time.sleep(1)
+                speak_response(random_phrase(FOLLOW_UP_ASK))
 
 def chat_with_gpt(prompt):
     from openai import OpenAI
