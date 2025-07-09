@@ -364,9 +364,22 @@ def wait_for_wake_and_command():
             start_stop_command_listener() # Start listener for the whole session
             speak_response(random_phrase(FOLLOW_UP_YES))
 
+            no_command_count = 0
+
             while session_active:
                 command = listen_command()
                 command = command.lower() if command else ""
+
+                if "no command detected" in command:
+                    no_command_count += 1
+                    if no_command_count >= 2:
+                        speak_response("I'll be here if you need me.")
+                        session_active = False
+                    else:
+                        speak_response("I didn't hear you, can you repeat?")
+                    continue
+                
+                no_command_count = 0
 
                 if any(phrase in command for phrase in ["no thanks", "that's all", "stop", "nothing", "goodbye"]):
                     speak_response("Alright, see you later.")
