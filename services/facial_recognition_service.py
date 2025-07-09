@@ -46,7 +46,6 @@ def recognize_faces_vocally():
 
         if not face_locations:
             if time.time() - start_time > wating_time:
-                speak_response("Couldn't find a face!")
                 logger.warning("Timeout: No face found within 20 seconds.")
                 return "ghost"
             continue

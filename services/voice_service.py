@@ -5,6 +5,7 @@ from services.crypto_service import get_crypto_prices
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally, load_known_faces
 from services.user_profile_service import get_user_profile, create_profile_interactively
 from services.product_search_service import handle_tryon_command
+from services.datetime_service import get_time_date
 from util.session_state import set_active_profile, get_session_attribute
 import pvporcupine
 from pvrecorder import PvRecorder
@@ -16,9 +17,53 @@ import time
 import os
 import re
 from datetime import datetime, timedelta
+import threading
+import speech_recognition as sr
+from util.command_interrupt import set_stop_requested, is_stop_requested, reset_stop_requested
 
 # Load environment variables
 load_dotenv()
+
+# --- Stop Listener Components ---
+stop_listener_thread = None
+stop_thread_stop_event = threading.Event()
+
+def listen_for_stop_command_thread(): # runs in the background thread
+    recognizer = sr.Recognizer()
+    recognizer.pause_threshold = 0.5
+    recognizer.non_speaking_duration = 0.5
+    
+    with sr.Microphone() as source:
+        logger.info("Stop command listener thread started.")
+        while not stop_thread_stop_event.is_set():
+            try:
+                audio = recognizer.listen(source, timeout=1, phrase_time_limit=2)
+                command = recognizer.recognize_google(audio).lower()
+                if "stop" in command:
+                    logger.info("Stop command detected by listener.")
+                    set_stop_requested(True)
+                    break 
+            except sr.WaitTimeoutError:
+                continue
+            except (sr.UnknownValueError, sr.RequestError):
+                continue
+            except Exception as e:
+                logger.error(f"An unexpected error occurred in the stop listener: {e}")
+                break
+    logger.info("Stop command listener thread finished.")
+
+def start_stop_command_listener(): # starts the stop command listener thread
+    global stop_listener_thread, stop_thread_stop_event
+    if stop_listener_thread is None or not stop_listener_thread.is_alive():
+        stop_thread_stop_event.clear()
+        stop_listener_thread = threading.Thread(target=listen_for_stop_command_thread, daemon=True)
+        stop_listener_thread.start()
+
+def stop_stop_command_listener(): # stops the stop listener thread
+    global stop_thread_stop_event
+    if stop_listener_thread and stop_listener_thread.is_alive():
+        stop_thread_stop_event.set()
+# --- End of Stop Listener Components ---
 
 FOLLOW_UP_ASK = [
     "Anything else?",
@@ -34,8 +79,7 @@ FOLLOW_UP_YES = [
     "I'm here for you, what's next?"
 ]
 
-def wake_word_detected():
-    # Detect wake word using Porcupine.
+def wake_word_detected(): # Detect wake word using Porcupine.
     access_key = os.getenv("PORCUPINE_ACCESS_KEY")
     custom_model_path = os.path.join(os.path.dirname(__file__), "../hey_adonis.ppn")
 
@@ -61,6 +105,11 @@ def wake_word_detected():
 def process_command(command, user_profile=None):
     logger.debug(f"Processing command: {command}")
 
+    if is_stop_requested():
+        logger.info("Command processing aborted by user stop request.")
+        # No reset here, reset is handled where the stop is consumed.
+        return "Command stopped by user."
+
     # Check for event creation command
     if "add an event" in command.lower():
         if user_profile and user_profile.get("name", "").lower() != "alex":
@@ -79,6 +128,8 @@ def process_command(command, user_profile=None):
                 start_time=event_data["start_time"],
                 end_time=event_data["end_time"]
             )
+            if is_stop_requested():
+                return "Command stopped by user."
             if result.get("status") == "success":
                 logger.info(f"Event '{event_data['summary']}' added successfully.")
                 return f"Event '{event_data['summary']}' added successfully."
@@ -89,49 +140,79 @@ def process_command(command, user_profile=None):
             logger.exception(f"Error adding event: {e}")
             return "An error occurred while adding the event."
 
+    elif "time" in command or "date" in command:
+        logger.info("Detected time/date request.")
+        time_data = get_time_date()
+        if is_stop_requested():
+            return "Command stopped by user."
+        return f"The time is {time_data['time']} and the date is {time_data['date']}."
+
     elif "weather" in command:
         logger.info("Detected weather request.")
         location = user_profile["preferences"].get("location", "Bucharest") if user_profile else "Bucharest"
         weather_data = get_weather(location=location)
+        if is_stop_requested():
+            return "Command stopped by user."
         return f"The current weather is {weather_data['weather'][0]['description']}, {weather_data['main']['temp']} degrees Celsius."
 
     elif "news" in command:
         logger.info("Detected news request.")
         topics = user_profile["preferences"].get("news_topics", ["technology"]) if user_profile else ["technology"]
         news_data = get_news(topics=topics)
-
+        if is_stop_requested():
+            return "Command stopped by user."
         return f"Here's the latest news headline: {news_data['articles'][0]['title']}."
 
     elif "crypto" in command:
         logger.info("Detected crypto price request.")
         crypto_data = get_crypto_prices()
+        if is_stop_requested():
+            return "Command stopped by user."
         return f"Bitcoin is ${crypto_data['bitcoin']}, Ethereum is ${crypto_data['ethereum']}."
 
     elif "start facial recognition" in command:
         logger.info("Starting facial recognition process.")
-        return recognize_faces_vocally()
+        result = recognize_faces_vocally()
+        if is_stop_requested():
+            return "Command stopped by user."
+        return result
 
     elif "add my face" in command:
         logger.info("Starting face registration process.")
-        return add_face_vocally()
+        result = add_face_vocally()
+        if is_stop_requested():
+            return "Command stopped by user."
+        return result
 
     # Check for dismissal before selection to catch negative responses.
     elif get_session_attribute('tryon_active') and any(keyword in command for keyword in ["none", "neither", "don't like", "dislike", "not these"]):
         logger.info("User dismissed try-on options.")
         from services.product_search_service import handle_tryon_dismissal
-        return handle_tryon_dismissal()
+        result = handle_tryon_dismissal()
+        if is_stop_requested():
+            return "Command stopped by user."
+        return result
 
     elif any(keyword in command for keyword in ["try option", "select option", "first one", "second one", "third one"]):
         logger.info("Detected option selection command.")
         from services.product_search_service import handle_tryon_selection_command
-        return handle_tryon_selection_command(command)
+        result = handle_tryon_selection_command(command)
+        if is_stop_requested():
+            return "Command stopped by user."
+        return result
 
     elif "try on" in command or "try a" in command:
         logger.info("Detected try-on product command.")
-        return handle_tryon_command(command)
+        result = handle_tryon_command(command)
+        if is_stop_requested():
+            return "Command stopped by user."
+        return result
 
     else:
         logger.info("Command not recognized. Falling back to GPT.")
+        if is_stop_requested():
+            logger.info("Command processing aborted before GPT call.")
+            return "Command stopped by user."
         return chat_with_gpt(command)
 
 def handle_command(command):
@@ -207,7 +288,9 @@ def wait_for_wake_and_command():
         if wake_word_detected():
             logger.info("Wake word detected.")
             current_time = time.time()
-            needs_recognition = user_name is None or (current_time - last_recognition_time > 600)
+            
+            # Recognition is needed if no user is set, if the user is a guest, or if the session has expired (15 mins)
+            needs_recognition = user_name is None or user_name.lower() in ["unknown", "ghost"] or (current_time - last_recognition_time > 900)
 
             if needs_recognition:
                 user_name = recognize_faces_vocally()
@@ -216,7 +299,8 @@ def wait_for_wake_and_command():
 
                 if user_name == "ghost":
                     logger.info("No face detected. Restarting loop.")
-                    speak_response("Maybe I'm hearing things!")
+                    speak_response("Must have been the wind.")
+                    user_name = None  # Reset user to force re-authentication
                     continue
 
                 known_faces = load_known_faces()
@@ -294,7 +378,20 @@ def wait_for_wake_and_command():
                     continue
 
                 logger.info(f"Processing command: {command}")
+                
+                start_stop_command_listener()
+                
                 response = process_command(command, current_user_profile)
+
+                stop_stop_command_listener()
+                
+                if is_stop_requested():
+                    logger.info("Command flow interrupted by stop request. Returning to idle.")
+                    reset_stop_requested()
+                    speak_response("Stopping.")
+                    session_active = False
+                    continue
+
                 if response:
                     speak_response(response)
                 else:
@@ -313,6 +410,10 @@ def chat_with_gpt(prompt):
     from openai import OpenAI
     # Interact with OpenAI's GPT model for general queries.
     try:
+        if is_stop_requested():
+            logger.info("GPT interaction cancelled by user stop request.")
+            return "Command stopped by user."
+
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model="gpt-4o-mini",

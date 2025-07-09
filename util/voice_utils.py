@@ -5,6 +5,7 @@ from util.logger import logger
 from util.socket_manager import socketio
 from util.audio_state import set_audio_playing, is_audio_playing
 import time
+from util.command_interrupt import is_stop_requested, reset_stop_requested
 
 def wait_for_audio_completion(text=None, max_timeout=8):
     waited = 0
@@ -16,6 +17,11 @@ def wait_for_audio_completion(text=None, max_timeout=8):
         estimated_duration = min(word_count * 0.5, max_timeout)
 
     while is_audio_playing() and waited < estimated_duration:
+        if is_stop_requested():
+            logger.info("Audio playback aborted by user stop request.")
+            socketio.emit("stop_audio")
+            reset_stop_requested()
+            break
         time.sleep(0.2)
         waited += 0.2
 
@@ -26,6 +32,11 @@ def wait_for_audio_completion(text=None, max_timeout=8):
 
 
 def speak_response(text):
+    if is_stop_requested():
+        logger.info(f"Speak response for '{text}' cancelled by user stop request.")
+        reset_stop_requested()
+        return
+
     logger.info(f"TTS starting for response: {text}")
     client = texttospeech.TextToSpeechClient()
     synthesis_input = texttospeech.SynthesisInput(text=text)
@@ -35,7 +46,7 @@ def speak_response(text):
         name="en-US-Wavenet-D"
     )
 
-    audio_config = texttospeech.AudioConfig(
+    audio_config = texttospeech.AudioConfig( 
         audio_encoding=texttospeech.AudioEncoding.MP3
     )
 

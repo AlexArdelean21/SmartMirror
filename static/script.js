@@ -5,6 +5,43 @@ let previousCalendar = "";
 const socket = io();
 let currentTryOnItems = [];
 let liveTryOn = null; // To hold our live try-on instance
+let currentAudio = null;
+
+// Socket.IO listeners
+socket.on('connect', () => {
+    console.log('🔌 Socket.IO connected!');
+});
+
+socket.on('play_audio', (data) => {
+    console.log('▶️ Received play_audio event', data);
+    playSpeechAudio(data.audio_url);
+    const voiceText = document.getElementById('voice-text');
+    voiceText.textContent = data.text;
+});
+
+socket.on('stop_audio', () => {
+    console.log('⏹️ Received stop_audio event');
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = ""; // Release resources
+        const voiceBox = document.getElementById('voice-response');
+        voiceBox.classList.remove('speaking');
+        voiceBox.classList.remove('listening');
+    }
+});
+
+socket.on('start_listening', () => {
+    console.log('🎤 Started listening');
+    const voiceBox = document.getElementById('voice-response');
+    voiceBox.classList.add('listening');
+});
+
+socket.on('stop_listening', () => {
+    console.log('🛑 Stopped listening');
+    const voiceBox = document.getElementById('voice-response');
+    voiceBox.classList.remove('listening');
+});
+
 
 // Update Time and Date
 function updateTimeAndDate() {
@@ -134,6 +171,11 @@ function updateCalendar() {
 function playSpeechAudio(audioUrl) {
     console.log("📢 [playSpeechAudio] Audio URL:", audioUrl);
 
+    if (currentAudio && !currentAudio.paused) {
+        currentAudio.pause();
+        currentAudio.src = "";
+    }
+
     const canvas = document.getElementById('voice-visualizer');
     const ctx = canvas.getContext('2d');
     const voiceBox = document.getElementById('voice-response');
@@ -144,6 +186,7 @@ function playSpeechAudio(audioUrl) {
     }
 
     const audio = new Audio(audioUrl);
+    currentAudio = audio; // Assign to global variable
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const source = audioContext.createMediaElementSource(audio);
     const analyser = audioContext.createAnalyser();
@@ -347,6 +390,18 @@ socket.on("start_listening", () => {
 
 socket.on("stop_listening", () => {
     document.getElementById("voice-text").textContent = "";
+    document.getElementById("voice-response").classList.remove("listening");
+    document.getElementById("mic-icon").classList.remove("listening");
+});
+
+socket.on('stop_audio', () => {
+    console.log('⏹️ Received stop_audio event');
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = ""; // Release resources
+    }
+    document.getElementById("voice-text").textContent = "";
+    document.getElementById("voice-response").classList.remove("speaking");
     document.getElementById("voice-response").classList.remove("listening");
     document.getElementById("mic-icon").classList.remove("listening");
 });

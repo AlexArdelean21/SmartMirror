@@ -160,5 +160,3 @@ if __name__ == '__main__':
     from services.voice_service import wait_for_wake_and_command
     Thread(target=wait_for_wake_and_command, daemon=True).start()
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
-
-
