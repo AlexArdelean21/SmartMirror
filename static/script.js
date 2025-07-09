@@ -576,7 +576,7 @@ updateNews();
 updateCrypto();
 updateCalendar();
 
-setInterval(updateCalendar, 600000); // Refresh every 10 minutes
+setInterval(updateCalendar, 60000); // Refresh every minute
 setInterval(updateTimeAndDate, 5000); // Update time every 5 second
 setInterval(updateWeather, 300000); // Update weather every 5 minutes
 setInterval(updateNews, 60000); // Update news every 10 minutes

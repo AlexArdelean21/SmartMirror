@@ -6,6 +6,7 @@ from services.facial_recognition_service import add_face_vocally, recognize_face
 from services.user_profile_service import get_user_profile, create_profile_interactively
 from services.product_search_service import handle_tryon_command
 from services.datetime_service import get_time_date
+from services.recommendation_service import generate_personal_recommendation
 from util.session_state import set_active_profile, get_session_attribute
 import pvporcupine
 from pvrecorder import PvRecorder
@@ -77,6 +78,12 @@ FOLLOW_UP_YES = [
     "Go ahead, I'm listening.",
     "What would you like to do next?",
     "I'm here for you, what's next?"
+]
+
+RECOMMENDATION_KEYWORDS = [
+    "recommendation","recommend", "suggest", "advice",
+    "what should I do", "what should I wear",
+    "any ideas", "give me a tip"
 ]
 
 def wake_word_detected(): # Detect wake word using Porcupine.
@@ -208,6 +215,15 @@ def process_command(command, user_profile=None):
             return "Command stopped by user."
         return result
 
+    elif any(keyword in command for keyword in RECOMMENDATION_KEYWORDS):
+        logger.info("Detected recommendation request.")
+        if not user_profile or user_profile.get("name", "unknown").lower() == "unknown":
+            return "I can't give a recommendation without knowing who you are. Please log in first."
+        result = generate_personal_recommendation(user_profile)
+        if is_stop_requested():
+            return "Command stopped by user."
+        return result
+        
     else:
         logger.info("Command not recognized. Falling back to GPT.")
         if is_stop_requested():
