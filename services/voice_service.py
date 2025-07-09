@@ -432,9 +432,17 @@ def chat_with_gpt(prompt):
             return "Command stopped by user."
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # Add a fallback for misunderstood commands
+        enhanced_prompt = (
+            f"{prompt}\n\n"
+            "If the text so far didn't make sense, just respond with: "
+            "\"I didn't get that, can you repeat?\""
+        )
+        
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": enhanced_prompt}]
         )
         message = response.choices[0].message.content
         logger.debug(f"GPT response: {message}")
