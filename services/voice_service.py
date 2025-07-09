@@ -361,15 +361,12 @@ def wait_for_wake_and_command():
             
             # Session starts here
             session_active = True
+            start_stop_command_listener() # Start listener for the whole session
             speak_response(random_phrase(FOLLOW_UP_YES))
 
             while session_active:
                 command = listen_command()
                 command = command.lower() if command else ""
-
-                if not command or "no command" in command:
-                    speak_response("I didn't catch that. Could you repeat?")
-                    continue
 
                 if any(phrase in command for phrase in ["no thanks", "that's all", "stop", "nothing", "goodbye"]):
                     speak_response("Alright, see you later.")
@@ -377,34 +374,54 @@ def wait_for_wake_and_command():
                     session_active = False
                     continue
 
-                logger.info(f"Processing command: {command}")
-                
+                # Start the stop listener only when a command is being processed or spoken.
                 start_stop_command_listener()
                 
-                response = process_command(command, current_user_profile)
+                logger.info(f"Processing command: {command}")
+                response_container = {"response": None}
+                def command_task():
+                    response_container["response"] = process_command(command, current_user_profile)
 
-                stop_stop_command_listener()
+                command_thread = threading.Thread(target=command_task)
+                command_thread.start()
+
+                # Monitor the command thread and the stop flag simultaneously.
+                while command_thread.is_alive():
+                    if is_stop_requested():
+                        logger.info("Stop request detected while command was running. Abandoning command.")
+                        break
+                    time.sleep(0.1)
                 
+                # If stop was requested, end the session immediately.
                 if is_stop_requested():
-                    logger.info("Command flow interrupted by stop request. Returning to idle.")
                     reset_stop_requested()
-                    speak_response("Stopping.")
+                    speak_response("Ok, bye.")
+                    session_active = False
+                    # The listener will be stopped at the end of the session loop.
+                    continue
+
+                response = response_container["response"]
+                if response:
+                    speak_response(response) # This is a blocking call. The stop listener is active.
+
+                # If stop was requested during speech, end the session.
+                if is_stop_requested():
+                    reset_stop_requested()
+                    # Don't speak, the audio handler already stopped the playback.
                     session_active = False
                     continue
 
-                if response:
-                    speak_response(response)
-                else:
-                    logger.warning("No response generated for the command.")
+                # Stop the listener before asking for the next command to avoid mic conflict.
+                stop_stop_command_listener()
 
-                # If the command was a successful try-on search, the response already asks for a selection.
-                # We should immediately listen for the user's choice instead of asking a generic follow-up.
+                # Follow-up prompt
                 is_tryon_search = "try on" in command or "try a" in command
-                if is_tryon_search and response and "Sorry" not in response:
-                    continue
-                
-                time.sleep(1)
-                speak_response(random_phrase(FOLLOW_UP_ASK))
+                if not (is_tryon_search and response and "Sorry" not in response):
+                    time.sleep(1)
+                    speak_response(random_phrase(FOLLOW_UP_ASK))
+
+            # End of session, ensure listener is stopped.
+            stop_stop_command_listener()
 
 def chat_with_gpt(prompt):
     from openai import OpenAI
