@@ -14,6 +14,7 @@ import logging
 import time
 import os
 from util.logger import logger
+from util.audio_state import set_audio_playing
 
 app = Flask(__name__)
 socketio.init_app(app, cors_allowed_origins="*")
@@ -49,6 +50,12 @@ def crypto():
     if "error" in crypto_data:
         return jsonify(crypto_data), 500
     return jsonify(crypto_data)
+
+
+@socketio.on('audio_finished')
+def handle_audio_finished():
+    logger.debug("Client signaled audio finished.")
+    set_audio_playing(False)
 
 
 @app.route('/voice_command')

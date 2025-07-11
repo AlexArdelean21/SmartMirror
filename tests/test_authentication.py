@@ -40,7 +40,10 @@ class TestAuthenticationFlow(unittest.TestCase):
             1100, # Alex (session starts)
             1200, # Unknown
             2200, # Alex (session has timed out)
-            2300  # Alex (within new session, no recognition needed)
+            2300, # Alex (within new session, no recognition needed)
+            2301, 2302, 2303, 2304, 2305, 2306, 2307, 2308, 2309, 2310,
+            2311, 2312, 2313, 2314, 2315, 2316, 2317, 2318, 2319, 2320,
+            2321, 2322, 2323, 2324, 2325, 2326, 2327, 2328, 2329, 2330
         ]
                                  
         mock_recognize_faces.side_effect = ["ghost", "Alex", "Unknown", "Alex"]
@@ -48,7 +51,8 @@ class TestAuthenticationFlow(unittest.TestCase):
         mock_listen_command.side_effect = [
             "yes", "command 1", "that's all", # For Alex's first session
             "no", "command 2", "that's all", # For Unknown's session
-            "yes", "command 3", "that's all"  # For Alex's second session
+            "yes", "command 3", "that's all",  # For Alex's second session
+            "that's all", "that's all", "that's all", "that's all"
         ]
         mock_load_known_faces.return_value = {"Alex": "some_encoding"}
         

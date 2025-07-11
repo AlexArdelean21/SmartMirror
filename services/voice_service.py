@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 import threading
 import speech_recognition as sr
 from util.command_interrupt import set_stop_requested, is_stop_requested, reset_stop_requested
+from util.audio_state import is_audio_playing
 
 # Load environment variables
 load_dotenv()
@@ -37,6 +38,10 @@ def listen_for_stop_command_thread(): # runs in the background thread
     with sr.Microphone() as source:
         logger.info("Stop command listener thread started.")
         while not stop_thread_stop_event.is_set():
+            if is_audio_playing():
+                time.sleep(0.5)
+                continue
+
             try:
                 audio = recognizer.listen(source, timeout=1, phrase_time_limit=2)
                 command = recognizer.recognize_google(audio).lower()

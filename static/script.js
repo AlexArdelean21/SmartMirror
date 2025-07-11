@@ -212,6 +212,11 @@ function playSpeechAudio(audioUrl) {
 
     let animationFrameId;
 
+    audio.onended = () => {
+        console.log('Audio finished playing.');
+        socket.emit('audio_finished');
+    };
+
     function drawSineWave() {
         analyser.getByteTimeDomainData(dataArray);
 

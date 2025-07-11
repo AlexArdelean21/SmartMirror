@@ -7,27 +7,31 @@ from util.audio_state import set_audio_playing, is_audio_playing
 import time
 from util.command_interrupt import is_stop_requested, reset_stop_requested
 
-def wait_for_audio_completion(text=None, max_timeout=8):
-    waited = 0
+def wait_for_audio_completion(timeout=60):
+    """
+    Waits for the audio playback to complete.
 
-    if not text:
-        estimated_duration = 2  # fallback default
-    else:
-        word_count = len(text.split())
-        estimated_duration = min(word_count * 0.5, max_timeout)
+    This function polls the audio playing state, which is expected to be
+    set to False by a client-side 'audio_finished' event. It includes a
+    timeout to prevent indefinite waiting.
+    """
+    start_time = time.time()
+    while is_audio_playing():
+        if time.time() - start_time > timeout:
+            logger.warning(f"Audio playback wait timed out after {timeout} seconds.")
+            set_audio_playing(False)  # Reset state to prevent deadlock
+            break
 
-    while is_audio_playing() and waited < estimated_duration:
         if is_stop_requested():
             logger.info("Audio playback aborted by user stop request.")
             socketio.emit("stop_audio")
             reset_stop_requested()
+            set_audio_playing(False)  # Reset state
             break
-        time.sleep(0.2)
-        waited += 0.2
 
-    if is_audio_playing():
-        logger.warning("Audio playback wait timed out.")
-    else:
+        time.sleep(0.1)
+
+    if not is_audio_playing():
         logger.debug("Audio playback confirmed as finished.")
 
 
@@ -78,7 +82,7 @@ def speak_response(text):
         "text": text
     })
 
-    wait_for_audio_completion(text)
+    wait_for_audio_completion()
 
 
 def listen_command():
