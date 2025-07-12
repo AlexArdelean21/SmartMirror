@@ -37,6 +37,7 @@
         <button onclick="setTheme('theme-afternoon')">Afternoon</button>
         <button onclick="setTheme('theme-evening')">Evening</button>
         <button onclick="setTheme('theme-night')">Night</button>
+        <button onclick="testTransition()">Test Transition</button>
     </div>
 
     <!-- You can include your main index content here to see how it looks with themes -->
@@ -48,6 +49,20 @@
             const themes = ['theme-morning', 'theme-afternoon', 'theme-evening', 'theme-night'];
             body.classList.remove(...themes);
             body.classList.add(theme);
+        }
+
+        function testTransition() {
+            const themes = ['theme-morning', 'theme-afternoon', 'theme-evening', 'theme-night', 'theme-morning']; // End on morning
+            let i = 0;
+
+            function cycle() {
+                if (i < themes.length) {
+                    setTheme(themes[i]);
+                    i++;
+                    setTimeout(cycle, 3000); // 2s for transition, 1s pause
+                }
+            }
+            cycle();
         }
     </script>
 </body>

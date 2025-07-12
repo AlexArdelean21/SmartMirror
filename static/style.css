@@ -1,8 +1,7 @@
-/* Background - subtle gradient to make text readable */
+/* Background - sun-cycle gradient */
 body {
     font-family: Arial, sans-serif;
     color: white;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.5));
     margin: 0;
     overflow: hidden;
     display: flex;
@@ -11,25 +10,41 @@ body {
     justify-content: center;
     height: 100vh;
     text-align: center;
-    transition: background 2s ease-in-out;
     overflow-y: auto !important;
+
+    /* A single, continuous gradient for all times of day */
+    background: linear-gradient(to bottom,
+        /* Night -> Morning */
+        #09203f 0%, #537895 25%,
+        /* Morning -> Afternoon */
+        #fbc2eb 35%, #a6c1ee 50%,
+        /* Afternoon -> Evening */
+        #89f7fe 60%, #66a6ff 75%,
+        /* Evening -> Night */
+        #30cfd0 85%, #330867 100%
+    );
+    background-size: 100% 400%;
+    background-position: 0 0; /* Start at the top (Night) */
+    
+    /* Slower, smoother transition of the background position */
+    transition: background-position 8s ease-in-out;
 }
 
-/* Time-based background themes */
+/* Time-based themes now control the background position */
 .theme-morning {
-    background: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%) !important;
+    background-position: 0 33.33%; /* Moves down to sunrise */
 }
 
 .theme-afternoon {
-    background: linear-gradient(to top, #89f7fe 0%, #66a6ff 100%) !important;
+    background-position: 0 66.67%; /* Moves down to daytime */
 }
 
 .theme-evening {
-    background: linear-gradient(to top, #30cfd0 0%, #330867 100%) !important;
+    background-position: 0 100%; /* Moves down to sunset */
 }
 
 .theme-night {
-    background: linear-gradient(to top, #09203f 0%, #537895 100%) !important;
+    background-position: 0 0; /* Returns to night at the top */
 }
 
 /* Smart Mirror Grid Layout */
