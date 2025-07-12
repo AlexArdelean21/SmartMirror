@@ -167,6 +167,26 @@ function updateCalendar() {
         });
 }
 
+// Function to update background theme based on time
+function updateTheme() {
+    const hour = new Date().getHours();
+    const body = document.body;
+    const themes = ['theme-morning', 'theme-afternoon', 'theme-evening', 'theme-night'];
+
+    // Remove any existing theme classes
+    body.classList.remove(...themes);
+
+    if (hour >= 5 && hour < 11) {
+        body.classList.add('theme-morning');
+    } else if (hour >= 11 && hour < 17) {
+        body.classList.add('theme-afternoon');
+    } else if (hour >= 17 && hour < 21) {
+        body.classList.add('theme-evening');
+    } else {
+        body.classList.add('theme-night');
+    }
+}
+
 
 function playSpeechAudio(audioUrl) {
     console.log("📢 [playSpeechAudio] Audio URL:", audioUrl);
@@ -263,17 +283,31 @@ function playSpeechAudio(audioUrl) {
         });
 }
 
-document.getElementById('audio-init-button').addEventListener('click', () => {
-    const audio = new Audio();
-    audio.play().catch(() => {
-        console.warn("Silent boot play failed, continuing...");
-    });
+document.addEventListener('DOMContentLoaded', () => {
+    const initButton = document.getElementById('audio-init-button');
+    if (initButton) {
+        initButton.addEventListener('click', () => {
+            console.log("Audio context initialized by user gesture.");
+            triggerVoicePlayback();
+            initButton.classList.add('hidden');
+        });
+    }
 
-    document.getElementById('audio-init-button').classList.add('hidden');
+    // Initial data fetch
+    updateTimeAndDate();
+    updateWeather();
+    updateNews();
+    updateCrypto();
+    updateCalendar();
+    updateTheme(); // Set initial theme
 
-    setTimeout(() => {
-        triggerVoicePlayback();
-    }, 2000);
+    // Set intervals for updates
+    setInterval(updateTimeAndDate, 60000); // Every minute
+    setInterval(updateWeather, 600000);   // Every 10 minutes
+    setInterval(updateNews, 900000);      // Every 15 minutes
+    setInterval(updateCrypto, 300000);    // Every 5 minutes
+    setInterval(updateCalendar, 900000);  // Every 15 minutes
+    setInterval(updateTheme, 60000);      // Update theme every minute
 });
 
 
@@ -573,16 +607,3 @@ class LiveTryOn {
         console.log("Live Try-On session stopped.");
     }
 }
-
-// Schedule updates
-updateTimeAndDate();
-updateWeather();
-updateNews();
-updateCrypto();
-updateCalendar();
-
-setInterval(updateCalendar, 60000); // Refresh every minute
-setInterval(updateTimeAndDate, 5000); // Update time every 5 second
-setInterval(updateWeather, 300000); // Update weather every 5 minutes
-setInterval(updateNews, 60000); // Update news every 10 minutes
-setInterval(updateCrypto, 300000); // Update crypto prices every 5 minutes

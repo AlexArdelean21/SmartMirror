@@ -26,6 +26,10 @@ werkzeug_log = logging.getLogger('werkzeug')
 def home():
     return render_template('index.html')
 
+@app.route('/test_themes')
+def test_themes():
+    return render_template('test_themes.html')
+
 @app.route('/time_date')
 def time_date():
     return jsonify(get_time_date())

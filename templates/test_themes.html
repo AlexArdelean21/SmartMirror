@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme Tester</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .theme-tester {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            z-index: 9999;
+            display: flex;
+            gap: 10px;
+        }
+        .theme-tester button {
+            padding: 8px 12px;
+            border-radius: 5px;
+            border: 1px solid white;
+            background-color: transparent;
+            color: white;
+            cursor: pointer;
+        }
+        .theme-tester button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="theme-night">
+
+    <div class="theme-tester">
+        <button onclick="setTheme('theme-morning')">Morning</button>
+        <button onclick="setTheme('theme-afternoon')">Afternoon</button>
+        <button onclick="setTheme('theme-evening')">Evening</button>
+        <button onclick="setTheme('theme-night')">Night</button>
+    </div>
+
+    <!-- You can include your main index content here to see how it looks with themes -->
+    {% include 'index.html' %}
+
+    <script>
+        function setTheme(theme) {
+            const body = document.body;
+            const themes = ['theme-morning', 'theme-afternoon', 'theme-evening', 'theme-night'];
+            body.classList.remove(...themes);
+            body.classList.add(theme);
+        }
+    </script>
+</body>
+</html> 

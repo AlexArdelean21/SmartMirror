@@ -11,6 +11,25 @@ body {
     justify-content: center;
     height: 100vh;
     text-align: center;
+    transition: background 2s ease-in-out;
+    overflow-y: auto !important;
+}
+
+/* Time-based background themes */
+.theme-morning {
+    background: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%) !important;
+}
+
+.theme-afternoon {
+    background: linear-gradient(to top, #89f7fe 0%, #66a6ff 100%) !important;
+}
+
+.theme-evening {
+    background: linear-gradient(to top, #30cfd0 0%, #330867 100%) !important;
+}
+
+.theme-night {
+    background: linear-gradient(to top, #09203f 0%, #537895 100%) !important;
 }
 
 /* Smart Mirror Grid Layout */
@@ -228,10 +247,6 @@ body {
     flex-wrap: wrap;
     justify-content: center;
     align-items: flex-start;
-}
-
-body {
-    overflow-y: auto !important;
 }
 
 html, body {
