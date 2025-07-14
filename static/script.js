@@ -149,9 +149,28 @@ function updateCalendar() {
             } else if (data.length === 0) {
                 calendarDiv.textContent = "No upcoming events.";
             } else {
-                let newCalendarHTML = data.map(event =>
-                    `<div class="calendar-event">${event.summary} - ${event.start.dateTime || event.start.date}</div>`
-                ).join('');
+                let newCalendarHTML = data.map(event => {
+                    const eventDate = new Date(event.start.dateTime || event.start.date);
+                    const now = new Date();
+                    
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                    const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+
+                    let dayString = '';
+                    if (eventDay.getTime() === today.getTime()) {
+                        dayString = 'today';
+                    } else if (eventDay.getTime() === tomorrow.getTime()) {
+                        dayString = 'tomorrow';
+                    } else {
+                        // Fallback for other days, maybe show date
+                        dayString = eventDate.toLocaleDateString(undefined, { weekday: 'long' });
+                    }
+
+                    const timeString = eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                    
+                    return `<div class="calendar-event">${event.summary} - ${timeString} ${dayString}</div>`;
+                }).join('');
 
                 if (previousCalendar !== newCalendarHTML) {
                     previousCalendar = newCalendarHTML;
