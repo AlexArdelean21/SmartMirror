@@ -384,7 +384,19 @@ def wait_for_wake_and_command():
 
                     if any(word in user_response for word in ["yes", "sure", "okay", "yeah"]):
                         speak_response("Please state your name clearly.")
-                        user_name = listen_command()
+                        
+                        user_name = ""
+                        for _ in range(2):  # Allow 2 attempts
+                            name_input = listen_command()
+                            name_input_lower = name_input.lower() if name_input else ""
+                            if name_input and "no command detected" not in name_input_lower:
+                                user_name = name_input
+                                break
+                            speak_response("I didn't catch that. Please state your name again.")
+
+                        if not user_name:
+                            speak_response("I'm having trouble understanding. We can try again later.")
+                            continue
 
                         if user_name in known_faces:
                             speak_response("This username is taken. Try another one.")
