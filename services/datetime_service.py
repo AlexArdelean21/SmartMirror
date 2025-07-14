@@ -7,7 +7,7 @@ CACHE_TIMEOUT = 30
 
 def get_time_date():
     now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
+    current_time = now.strftime("%H:%M")
     current_date = now.strftime("%Y-%m-%d")
     data = {"time": current_time, "date": current_date}
 

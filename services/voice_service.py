@@ -1,4 +1,4 @@
-from services.calendar_service import add_event
+from services.calendar_service import add_event, get_upcoming_events
 from services.weather_service import get_weather
 from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
@@ -151,6 +151,57 @@ def process_command(command, user_profile=None):
         except Exception as e:
             logger.exception(f"Error adding event: {e}")
             return "An error occurred while adding the event."
+
+    elif "do i have any plans" in command.lower() or "do i have any events" in command.lower():
+        logger.info("Detected calendar event check command.")
+        user_name = user_profile.get("name", "unknown").lower() if user_profile else "unknown"
+
+        if user_name != "alex":
+            logger.warning(f"Unauthorized calendar access attempt by: {user_name}")
+            return "Sorry, the calendar is not accessible for you."
+
+        try:
+            events = get_upcoming_events(max_results=5)
+            if is_stop_requested():
+                return "Command stopped by user."
+
+            if not events or "error" in events:
+                logger.info("No upcoming events found or an error occurred.")
+                return "You have no upcoming events."
+
+            response_parts = []
+            now = datetime.now()
+            today = now.date()
+            tomorrow = (now + timedelta(days=1)).date()
+
+            for event in events:
+                summary = event.get("summary", "No Title")
+                start_str = event.get("start", {}).get("dateTime")
+                
+                if not start_str:
+                    continue
+
+                start_dt = datetime.fromisoformat(start_str)
+                start_date = start_dt.date()
+                start_time = start_dt.strftime("%I:%M %p") # e.g., 03:00 PM
+
+                if start_date == today:
+                    date_prefix = "Today"
+                elif start_date == tomorrow:
+                    date_prefix = "Tomorrow"
+                else:
+                    date_prefix = start_dt.strftime("%A, %B %d")
+
+                response_parts.append(f"{summary} at {start_time} {date_prefix}")
+            
+            if not response_parts:
+                return "You have no upcoming events with a specific time."
+
+            return "Here are your upcoming events: " + ", ".join(response_parts)
+
+        except Exception as e:
+            logger.exception(f"Error getting calendar events: {e}")
+            return "Sorry, I couldn't retrieve your events right now."
 
     elif "time" in command or "date" in command:
         logger.info("Detected time/date request.")
