@@ -12,11 +12,16 @@ def generate_personal_recommendation(user_profile: dict) -> str:
     """
     try:
         now = datetime.datetime.now()
-        time_of_day = "morning"
-        if 12 <= now.hour < 17:
+        hour = now.hour
+        
+        if 5 <= hour < 12:
+            time_of_day = "morning"
+        elif 12 <= hour < 17:
             time_of_day = "afternoon"
-        elif now.hour >= 17:
+        elif 17 <= hour < 21:
             time_of_day = "evening"
+        else:
+            time_of_day = "night"
 
         location = user_profile.get('preferences', {}).get('location', 'Bucharest')
         weather_data = get_weather(location)
