@@ -4,10 +4,10 @@ from services.news_service import get_news
 from services.crypto_service import get_crypto_prices
 from services.facial_recognition_service import add_face_vocally, recognize_faces_vocally, load_known_faces
 from services.user_profile_service import get_user_profile, create_profile_interactively
-from services.product_search_service import handle_tryon_command
+from services.product_search_service import handle_tryon_command, handle_tryon_dismissal, handle_tryon_selection_command
 from services.datetime_service import get_time_date
 from services.recommendation_service import generate_personal_recommendation
-from util.session_state import set_active_profile, get_session_attribute
+from util.session_state import set_active_profile, get_session_attribute, set_session_attribute
 import pvporcupine
 from pvrecorder import PvRecorder
 from util.voice_utils import speak_response, listen_command
@@ -116,6 +116,11 @@ def wake_word_detected(): # Detect wake word using Porcupine.
 
 def process_command(command, user_profile=None):
     logger.debug(f"Processing command: {command}")
+
+    # Prioritize 'stop' when try-on is active.
+    if get_session_attribute('tryon_active') and "stop" in command.lower():
+        logger.info("Stop command received during active try-on. Dismissing.")
+        return handle_tryon_dismissal()
 
     if is_stop_requested():
         logger.info("Command processing aborted by user stop request.")
@@ -250,7 +255,6 @@ def process_command(command, user_profile=None):
     # Check for dismissal before selection to catch negative responses.
     elif get_session_attribute('tryon_active') and any(keyword in command for keyword in ["none", "neither", "don't like", "dislike", "not these"]):
         logger.info("User dismissed try-on options.")
-        from services.product_search_service import handle_tryon_dismissal
         result = handle_tryon_dismissal()
         if is_stop_requested():
             return "Command stopped by user."
@@ -258,7 +262,6 @@ def process_command(command, user_profile=None):
 
     elif any(keyword in command for keyword in ["try option", "select option", "first one", "second one", "third one"]):
         logger.info("Detected option selection command.")
-        from services.product_search_service import handle_tryon_selection_command
         result = handle_tryon_selection_command(command)
         if is_stop_requested():
             return "Command stopped by user."

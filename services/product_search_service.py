@@ -107,8 +107,11 @@ def handle_tryon_selection_command(command):
     if index is not None:
         logger.info(f"Emitting try-on selection: option {index}")
         socketio.emit("try_on_selected_item", {"index": index})
+
+        logger.info("Waiting for 10 seconds before proceeding.")
+        time.sleep(10)
+
         clear_session_attribute('tryon_active')
-        return f"Trying on option {index + 1}."
     else:
         logger.warning("Couldn't determine which option to try.")
         return "I didn't understand which option to try. Please say option one, two, or three."

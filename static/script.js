@@ -42,6 +42,16 @@ socket.on('stop_listening', () => {
     voiceBox.classList.remove('listening');
 });
 
+socket.on("hide_tryon", () => {
+    console.log("Hiding try-on interface.");
+    toggleWidgetsVisibility(false, false); // Show main widgets, hide all try-on
+
+    if (liveTryOn) {
+        liveTryOn.stop();
+        liveTryOn = null;
+    }
+});
+
 
 // Update Time and Date
 function updateTimeAndDate() {
@@ -208,8 +218,6 @@ function updateTheme() {
 
 
 function playSpeechAudio(audioUrl) {
-    console.log("📢 [playSpeechAudio] Audio URL:", audioUrl);
-
     if (currentAudio && !currentAudio.paused) {
         currentAudio.pause();
         currentAudio.src = "";
@@ -300,7 +308,7 @@ function playSpeechAudio(audioUrl) {
         .catch(error => {
             console.error("Audio playback failed:", error);
         });
-}
+    }
 
 document.addEventListener('DOMContentLoaded', () => {
     const initButton = document.getElementById('audio-init-button');
@@ -541,7 +549,7 @@ class LiveTryOn {
         this.timeoutId = setTimeout(() => {
             console.log("Auto-closing try-on session after 20 seconds of inactivity.");
             toggleWidgetsVisibility(false, false);
-        }, 20000); // 20 seconds
+        }, 20000);
     }
 
     setOverlay(imageUrl) {
