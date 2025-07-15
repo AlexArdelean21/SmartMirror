@@ -1,285 +1,91 @@
-# Smart Mirror - Enhanced Virtual Try-On System
+# AI-Powered Smart Mirror
 
-An AI-powered Smart Mirror with advanced virtual try-on capabilities using pose estimation, real-time background removal, and clothing-specific positioning algorithms.
+This is an AI-powered Smart Mirror that provides a range of intelligent services through a modern, voice-controlled interface. It features personalized user profiles, real-time information widgets, and an advanced virtual try-on system.
 
-## 🌟 Enhanced Features
+## ✨ Core Features
 
-### Core Improvements
-- **Advanced Pose Estimation**: Enhanced MediaPipe Pose integration with confidence scoring and pose smoothing
-- **Clothing-Specific Behavior**: Category-aware positioning for jackets, shirts, pants, dresses, and tank tops
-- **Realistic Overlay Rendering**: Multi-layered shadow effects, anti-aliasing, and smooth scaling
-- **Asynchronous Background Removal**: Non-blocking background processing with loading states
-- **Intelligent Fallback System**: Automatic fallback when pose detection confidence is low
-- **Performance Optimizations**: Smooth animations, hardware acceleration, and efficient rendering
+The smart mirror is designed to be a central hub for your daily information needs, offering the following features:
 
-### Virtual Try-On Capabilities
+-   **🗣️ Voice-Controlled Interface:** Hands-free control using the "Hey Adonis" wake word, with natural language understanding for commands and conversation.
+-   **👤 Personalized User Profiles:** Uses facial recognition to identify users and load their preferences, including location, news topics, and calendar access.
+-   **☀️ Dynamic Information Widgets:** A clean, modern interface displaying:
+    -   Current Time & Date
+    -   Live Weather Updates
+    -   Latest News Headlines
+    -   Cryptocurrency Prices (Bitcoin & Ethereum)
+    -   Upcoming Google Calendar Events
+-   **🤖 AI Assistant:** Integrated with OpenAI's GPT models to provide conversational answers to general questions and generate personalized recommendations.
+-   **👕 Virtual Try-On:** An advanced feature that allows users to realistically try on clothing items using real-time pose estimation.
 
-#### Clothing Categories with Specific Positioning:
-- **Jackets**: Upper torso coverage with extended height and enhanced shadows
-- **Shirts**: Standard torso fitting with balanced proportions
-- **Tank Tops**: Shoulder-focused positioning with reduced width
-- **Pants**: Hip-to-ankle alignment with extended leg coverage
-- **Dresses**: Full-body coverage from shoulders to ankles
+## 👕 Virtual Try-On System
 
-#### Enhanced Pose Detection:
-- Real-time keypoint tracking with confidence scoring
-- 5-frame pose history for smooth movement
-- Automatic fallback when confidence drops below 60%
-- Support for both MediaPipe naming conventions
+The virtual try-on feature is a key component of the smart mirror, with several advanced capabilities:
 
-#### Realistic Rendering:
-- Category-specific shadow effects
-- Multi-layer drop shadows for depth
-- Anti-aliased image rendering
-- Smooth scaling transitions
-- Hardware-accelerated animations
+-   **Advanced Pose Estimation:** Integrates MediaPipe Pose for real-time body tracking with confidence scoring and smoothing to reduce jitter.
+-   **Clothing-Specific Behavior:** Uses category-aware positioning to correctly place different types of clothing, such as jackets, shirts, pants, and dresses.
+-   **Realistic Rendering:** Applies multi-layered shadow effects and anti-aliasing to create a more realistic and immersive overlay.
+-   **Background Removal:** Automatically removes the background from product images to ensure a clean overlay.
 
 ## 🛠️ Technical Implementation
 
-### Frontend Technologies
-- **Pose Detection**: MediaPipe Pose with TensorFlow.js
-- **Real-time Processing**: WebRTC for webcam access
-- **Rendering**: CSS3 transforms with hardware acceleration
-- **UI Framework**: Vanilla JavaScript with modern ES6+ features
+-   **Backend:** Python with **Flask** for the web server and API, and **Flask-SocketIO** for real-time WebSocket communication.
+-   **Frontend:** Vanilla JavaScript (ES6+) for logic, **MediaPipe** for pose detection, and **Socket.IO** client for real-time updates.
+-   **Voice & AI:**
+    -   **`pvporcupine`** for wake word detection.
+    -   **`SpeechRecognition`** for command transcription.
+    -   **Google Cloud Text-to-Speech** for audio responses.
+    -   **OpenAI GPT** for conversational AI.
+-   **Data & Services:**
+    -   **`face_recognition`** for user identification.
+    -   **`rembg`** for image background removal.
+    -   APIs for Weather, News, and Crypto data.
 
-### Backend Integration
-- **Flask**: Python web framework
-- **Background Removal**: rembg library with PIL
-- **Caching**: Flask-Caching for performance
-- **Real-time Communication**: Socket.IO
+## 📄 Project Structure
 
-### Key Algorithms
-
-#### 1. Pose Smoothing Algorithm
-```javascript
-// 5-frame moving average for stable tracking
-function smoothPose(poseHistory) {
-    // Weighted averaging across keypoints
-    // Confidence-based filtering
-    // Jitter reduction
-}
-```
-
-#### 2. Clothing Category Detection
-```javascript
-// AI-powered category classification
-function determineClothingCategory(item) {
-    // Title and description analysis
-    // Keyword matching
-    // Category-specific configurations
-}
-```
-
-#### 3. Dynamic Sizing Algorithm
-```javascript
-// Proportional scaling based on body measurements
-function calculateClothingDimensions(keypoints, categoryConfig) {
-    // Shoulder width calculation
-    // Torso height measurement
-    // Category-specific multipliers
-}
-```
+A detailed explanation of every file and directory in this project is available in the `PROJECT_STRUCTURE.md` file. This document provides a complete overview of the codebase architecture.
 
 ## 🚀 Installation & Setup
 
 ### Prerequisites
-```bash
-Python 3.8+
-Node.js (for package management)
-Webcam access
-Modern web browser with WebRTC support
-```
+-   Python 3.8+
+-   Webcam access
+-   A modern web browser (Chrome recommended)
+-   API keys for Google Cloud, OpenAI, NewsAPI, and OpenWeatherMap.
 
-### Backend Setup
-```bash
-# Install Python dependencies
-pip install -r requirements.txt
+### Setup Instructions
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd <repository-directory>
+    ```
 
-# Install rembg models (first run)
-python -c "from rembg import new_session; new_session('u2net')"
-```
+2.  **Install Python dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-### Frontend Dependencies
-The system uses CDN-based loading for optimal performance:
-- MediaPipe Pose
-- TensorFlow.js
-- Socket.IO
-- Font Awesome
+3.  **Set up environment variables:**
+    -   Create a `.env` file in the root directory.
+    -   Add your API keys and configuration to this file. See `PROJECT_STRUCTURE.md` for details on the required variables.
 
-### Running the Application
-```bash
-python app.py
-```
-Access at `http://localhost:5000`
+4.  **Run the application:**
+    ```bash
+    python app.py
+    ```
+5.  Open your web browser and navigate to `http://localhost:5000`.
 
-## 📋 API Endpoints
+## 🎯 Usage
 
-### Try-On System
-- `GET /find_clothing` - Fetch clothing items with filters
-- `POST /remove_background` - Async background removal
-- `GET /` - Main interface
+The primary way to interact with the mirror is through voice commands.
 
-### Real-time Features
-- `WebSocket: trigger_tryon` - Start try-on session
-- `WebSocket: try_on_selected_item` - Select specific item
+1.  **Activation:** The mirror is activated by saying the wake word: **"Hey Adonis"**.
+2.  **Facial Recognition:** After activation, it will use the camera to recognize the user and load their profile.
+3.  **Commands:** Once a user is logged in, you can issue commands like:
+    -   *"What's the weather?"*
+    -   *"Give me the news."*
+    -   *"Do I have any plans today?"*
+    -   *"Add an event called meeting tomorrow at 3 PM."*
+    -   *"I want to try on a black shirt."*
+    -   *"Tell me a joke."* (for the AI assistant)
 
-## 🎯 Usage Instructions
-
-### Voice Commands
-- "Show me jackets" - Display jacket options
-- "Try on item 2" - Select specific clothing item
-- Voice activation button for initial setup
-
-### Manual Interaction
-1. **Browse Options**: Clothing items display automatically
-2. **Select Item**: Click on desired clothing piece
-3. **Pose Detection**: Stand in front of camera for optimal tracking
-4. **Automatic Fitting**: System adjusts clothing based on your pose
-
-### Fallback Mode
-When pose detection confidence is low:
-- Automatic center positioning
-- User notification message
-- Graceful degradation
-
-## 🔧 Configuration Options
-
-### Pose Detection Settings
-```javascript
-const poseConfidenceThreshold = 0.6;  // Minimum confidence
-const POSE_HISTORY_SIZE = 5;          // Smoothing window
-```
-
-### Clothing Categories
-Modify `CLOTHING_CATEGORIES` object for custom clothing types:
-```javascript
-'custom-category': {
-    name: 'custom',
-    keypoints: ['leftShoulder', 'rightShoulder'],
-    positioning: {
-        widthMultiplier: 1.2,
-        heightMultiplier: 1.5,
-        topOffset: -0.1,
-        centerOffset: { x: 0, y: 0 }
-    },
-    shadows: { blur: 6, spread: 2, opacity: 0.25 }
-}
-```
-
-## 🎨 Styling Customization
-
-### CSS Variables
-Key styling can be modified through CSS custom properties:
-- Shadow effects: Adjust blur, spread, and opacity
-- Transition timing: Cubic-bezier curves for smooth animations
-- Color schemes: Modify overlay and UI colors
-
-### Performance CSS
-- Hardware acceleration with `transform3d()`
-- `will-change` properties for optimized rendering
-- Backface visibility hidden for smooth animations
-
-## 📱 Mobile Responsiveness
-
-### Responsive Breakpoints
-- Desktop: Full feature set
-- Tablet: Optimized overlay sizing
-- Mobile: Compact UI with essential features
-
-### Touch Interactions
-- Touch-friendly product cards
-- Swipe gestures for browsing
-- Optimized loading indicators
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-**Pose Detection Not Working**
-- Check webcam permissions
-- Ensure good lighting
-- Verify MediaPipe model loading
-
-**Background Removal Slow**
-- Check server performance
-- Verify rembg installation
-- Consider model optimization
-
-**Overlay Positioning Issues**
-- Calibrate pose confidence threshold
-- Check keypoint visibility
-- Verify clothing category detection
-
-### Performance Optimization
-
-**Frontend**
-- Enable hardware acceleration
-- Use requestAnimationFrame for smooth animations
-- Implement efficient DOM updates
-
-**Backend**
-- Cache processed images
-- Optimize rembg model loading
-- Use async processing
-
-## 🛡️ Browser Compatibility
-
-### Supported Browsers
-- Chrome 80+ (Recommended)
-- Firefox 75+
-- Safari 13+
-- Edge 80+
-
-### Required Features
-- WebRTC camera access
-- ES6+ JavaScript support
-- CSS3 transforms and filters
-- Canvas and WebGL support
-
-## 📊 Performance Metrics
-
-### Target Performance
-- Pose detection: 30 FPS
-- Background removal: <3 seconds
-- Overlay rendering: 60 FPS
-- Memory usage: <500MB
-
-### Optimization Features
-- Lazy loading for product images
-- Efficient pose smoothing algorithms
-- Hardware-accelerated CSS animations
-- Optimized WebGL usage
-
-## 🔮 Future Enhancements
-
-### Planned Features
-- 3D clothing models
-- Size recommendation AI
-- Multiple clothing items simultaneously
-- Augmented reality integration
-- Social sharing capabilities
-
-### Technical Roadmap
-- WebAssembly for faster processing
-- Machine learning model optimization
-- Enhanced pose estimation models
-- Real-time lighting adjustments
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Implement enhancements
-4. Add comprehensive tests
-5. Submit pull request
-
-## 📞 Support
-
-For technical support or feature requests:
-- Open GitHub issue
-- Check troubleshooting guide
-- Review API documentation 
+You can also interrupt the assistant at any time by saying **"Stop"**. 

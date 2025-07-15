@@ -23,10 +23,7 @@ import speech_recognition as sr
 from util.command_interrupt import set_stop_requested, is_stop_requested, reset_stop_requested
 from util.audio_state import is_audio_playing
 
-# Load environment variables
 load_dotenv()
-
-# --- Stop Listener Components ---
 stop_listener_thread = None
 stop_thread_stop_event = threading.Event()
 

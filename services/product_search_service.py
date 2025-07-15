@@ -84,7 +84,6 @@ def handle_tryon_command(command):
     return f"Okay, I found a few {color or ''} options for you. Let me know which one you'd like to try."
 
 def handle_tryon_dismissal():
-    """Emits an event to hide the try-on UI and clears the context."""
     logger.info("Hiding try-on items display.")
     socketio.emit("hide_tryon")
     clear_session_attribute('tryon_active')

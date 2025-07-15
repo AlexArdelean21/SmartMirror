@@ -6,15 +6,12 @@ from services.calendar_service import get_upcoming_events
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def generate_personal_recommendation(user_profile: dict) -> str:
-    """
-    Generates a personal recommendation for the user based on weather, calendar events, and time of day.
-    """
+def generate_personal_recommendation(user_profile: dict) -> str: # Generates a personal recommendation for the user based on weather, calendar events, and time of day.
     try:
         now = datetime.datetime.now()
         hour = now.hour
         
-        if 5 <= hour < 12:
+        if 6 <= hour < 12:
             time_of_day = "morning"
         elif 12 <= hour < 17:
             time_of_day = "afternoon"
