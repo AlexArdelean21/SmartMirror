@@ -44,7 +44,7 @@ def generate_personal_recommendation(user_profile: dict) -> str: # Generates a p
         response = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant providing concise, creative recommendations."},
+                {"role": "system", "content": "You are a helpful assistant providing concise, creative recommendations, don't add any simbold like this one * ."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=50,
