@@ -1,3 +1,4 @@
+// Test comment
 let previousWeather = "";
 let previousNews = "";
 let previousCrypto = "";
@@ -6,6 +7,9 @@ const socket = io();
 let currentTryOnItems = [];
 let liveTryOn = null; // To hold our live try-on instance
 let currentAudio = null;
+const audioQueue = [];
+let isAudioPlaying = false;
+
 
 // Socket.IO listeners
 socket.on('connect', () => {
@@ -14,32 +18,52 @@ socket.on('connect', () => {
 
 socket.on('play_audio', (data) => {
     console.log('▶️ Received play_audio event', data);
-    playSpeechAudio(data.audio_url);
-    const voiceText = document.getElementById('voice-text');
-    voiceText.textContent = data.text;
+    audioQueue.push(data);
+    if (!isAudioPlaying) {
+        processAudioQueue();
+    }
 });
 
 socket.on('stop_audio', () => {
     console.log('⏹️ Received stop_audio event');
+    audioQueue.length = 0; // Clear the queue
+
     if (currentAudio) {
         currentAudio.pause();
-        currentAudio.src = ""; // Release resources
-        const voiceBox = document.getElementById('voice-response');
-        voiceBox.classList.remove('speaking');
-        voiceBox.classList.remove('listening');
+        currentAudio.src = ''; // Release resources
     }
+
+    isAudioPlaying = false; // Reset playing state
+    const voiceBox = document.getElementById('voice-response');
+    voiceBox.classList.remove('speaking');
+    voiceBox.classList.remove('listening');
+
+    const micIcon = document.getElementById('mic-icon');
+    if(micIcon) micIcon.classList.remove('listening');
+
+    document.getElementById("voice-text").textContent = "";
 });
 
 socket.on('start_listening', () => {
     console.log('🎤 Started listening');
     const voiceBox = document.getElementById('voice-response');
     voiceBox.classList.add('listening');
+
+    const micIcon = document.getElementById('mic-icon');
+    if(micIcon) micIcon.classList.add('listening');
+
+    document.getElementById('voice-text').textContent = 'Listening...';
 });
 
 socket.on('stop_listening', () => {
     console.log('🛑 Stopped listening');
     const voiceBox = document.getElementById('voice-response');
     voiceBox.classList.remove('listening');
+
+    const micIcon = document.getElementById('mic-icon');
+    if(micIcon) micIcon.classList.remove('listening');
+
+    document.getElementById('voice-text').textContent = '';
 });
 
 socket.on("hide_tryon", () => {
@@ -49,6 +73,39 @@ socket.on("hide_tryon", () => {
     if (liveTryOn) {
         liveTryOn.stop();
         liveTryOn = null;
+    }
+});
+
+socket.on("trigger_tryon", (data) => {
+    console.log("Try-on trigger received:", data);
+
+    if (!data.category) {
+        toggleWidgetsVisibility(false, false);
+        document.getElementById("product-options").innerHTML = `
+            <span style="color:white;">No matching items found.</span>
+        `;
+        setTimeout(() => {
+            document.getElementById("product-options").innerHTML = "";
+        }, 4000);
+        return;
+    }
+
+    showTryOnOptions(data.category, data.color, data.max_price);
+});
+
+socket.on("try_on_selected_item", ({ index }) => {
+    console.log("Selected item index:", index);
+
+    const item = currentTryOnItems[index];
+    if (item) {
+        toggleWidgetsVisibility(false, true); // Hide options, show preview
+        if (liveTryOn) {
+            liveTryOn.setOverlay(item.processed_image_url);
+        } else {
+            console.error("Live Try-On not initialized, but it should be.");
+        }
+    } else {
+        console.error("Selected item index out of bounds:", index);
     }
 });
 
@@ -85,7 +142,7 @@ function updateWeather() {
             let weatherDesc = document.getElementById('weather-description');
             let weatherIcon = document.getElementById('weather-icon');
 
-            if (previousWeather !== newWeatherText) {  // Only update if data changes
+            if (previousWeather !== newWeatherText) { // Only update if data changes
                 previousWeather = newWeatherText;
                 weatherDesc.textContent = newWeatherText;
                 weatherDesc.classList.add('widget-update');
@@ -132,19 +189,6 @@ function updateCrypto() {
         });
 }
 
-// Poll Voice Responses and Update UI
-//function pollVoiceResponse() {
-//    fetch('/voice_command')
-//        .then(response => response.json())
-//        .then(data => {
-//            if (data.response_audio) {
-//                playSpeechAudio(data.response_audio);
-//                document.getElementById('voice-text').textContent = data.text;
-//            }
-//        })
-//        .catch(error => console.error('Error fetching voice response:', error));
-//}
-
 // Update Calendar
 function updateCalendar() {
     fetch('/calendar')
@@ -162,7 +206,7 @@ function updateCalendar() {
                 let newCalendarHTML = data.map(event => {
                     const eventDate = new Date(event.start.dateTime || event.start.date);
                     const now = new Date();
-                    
+
                     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
                     const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
@@ -174,11 +218,17 @@ function updateCalendar() {
                         dayString = 'tomorrow';
                     } else {
                         // Fallback for other days, maybe show date
-                        dayString = eventDate.toLocaleDateString(undefined, { weekday: 'long' });
+                        dayString = eventDate.toLocaleDateString(undefined, {
+                            weekday: 'long'
+                        });
                     }
 
-                    const timeString = eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                    
+                    const timeString = eventDate.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+
                     return `<div class="calendar-event">${event.summary} - ${timeString} ${dayString}</div>`;
                 }).join('');
 
@@ -217,11 +267,20 @@ function updateTheme() {
 }
 
 
-function playSpeechAudio(audioUrl) {
-    if (currentAudio && !currentAudio.paused) {
-        currentAudio.pause();
-        currentAudio.src = "";
+function processAudioQueue() {
+    if (audioQueue.length === 0 || isAudioPlaying) {
+        return;
     }
+
+    isAudioPlaying = true;
+    const data = audioQueue.shift();
+    playSpeechAudio(data.audio_url, data.text);
+}
+
+
+function playSpeechAudio(audioUrl, text) {
+    const voiceText = document.getElementById('voice-text');
+    voiceText.textContent = text;
 
     const canvas = document.getElementById('voice-visualizer');
     const ctx = canvas.getContext('2d');
@@ -229,12 +288,15 @@ function playSpeechAudio(audioUrl) {
 
     if (!audioUrl) {
         console.warn("⚠ No audio URL provided. Skipping voice playback.");
+        isAudioPlaying = false;
+        processAudioQueue();
         return;
     }
 
     const audio = new Audio(audioUrl);
     currentAudio = audio; // Assign to global variable
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    const audioContext = new(window.AudioContext || window.webkitAudioContext)();
     const source = audioContext.createMediaElementSource(audio);
     const analyser = audioContext.createAnalyser();
     const gainNode = audioContext.createGain();
@@ -262,6 +324,8 @@ function playSpeechAudio(audioUrl) {
     audio.onended = () => {
         console.log('Audio finished playing.');
         socket.emit('audio_finished');
+        isAudioPlaying = false;
+        processAudioQueue();
     };
 
     function drawSineWave() {
@@ -307,8 +371,10 @@ function playSpeechAudio(audioUrl) {
         })
         .catch(error => {
             console.error("Audio playback failed:", error);
+            isAudioPlaying = false;
+            processAudioQueue(); // Try next in queue
         });
-    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const initButton = document.getElementById('audio-init-button');
@@ -330,11 +396,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set intervals for updates
     setInterval(updateTimeAndDate, 60000); // Every minute
-    setInterval(updateWeather, 600000);   // Every 10 minutes
-    setInterval(updateNews, 900000);      // Every 15 minutes
-    setInterval(updateCrypto, 300000);    // Every 5 minutes
-    setInterval(updateCalendar, 900000);  // Every 15 minutes
-    setInterval(updateTheme, 60000);      // Update theme every minute
+    setInterval(updateWeather, 600000); // Every 10 minutes
+    setInterval(updateNews, 900000); // Every 15 minutes
+    setInterval(updateCrypto, 300000); // Every 5 minutes
+    setInterval(updateCalendar, 900000); // Every 15 minutes
+    setInterval(updateTheme, 60000); // Update theme every minute
 });
 
 
@@ -347,8 +413,13 @@ function triggerVoicePlayback(retries = 5, delay = 500) {
             .then(data => {
                 if (data.response_audio) {
                     console.log("Found audio:", data.response_audio);
-                    playSpeechAudio(data.response_audio);
-                    voiceText.textContent = data.text;
+                    audioQueue.push({
+                        audio_url: data.response_audio,
+                        text: data.text
+                    });
+                    if (!isAudioPlaying) {
+                        processAudioQueue();
+                    }
                 } else {
                     if (attempt < retries) {
                         console.warn(`⏳ Audio not ready yet (attempt ${attempt}). Retrying in ${delay}ms...`);
@@ -442,79 +513,13 @@ function toggleWidgetsVisibility(showOptions, showPreview) {
     }
 }
 
-socket.on("play_audio", (data) => {
-    console.log("[Socket] Received voice playback:", data);
-    playSpeechAudio(data.audio_url);
-    document.getElementById("voice-text").textContent = data.text;
-});
-
-socket.on("start_listening", () => {
-    document.getElementById("voice-text").textContent = "Listening...";
-    document.getElementById("voice-response").classList.add("listening");
-    document.getElementById("mic-icon").classList.add("listening");
-});
-
-socket.on("stop_listening", () => {
-    document.getElementById("voice-text").textContent = "";
-    document.getElementById("voice-response").classList.remove("listening");
-    document.getElementById("mic-icon").classList.remove("listening");
-});
-
-socket.on('stop_audio', () => {
-    console.log('⏹️ Received stop_audio event');
-    if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.src = ""; // Release resources
-    }
-    document.getElementById("voice-text").textContent = "";
-    document.getElementById("voice-response").classList.remove("speaking");
-    document.getElementById("voice-response").classList.remove("listening");
-    document.getElementById("mic-icon").classList.remove("listening");
-});
-
-socket.on("trigger_tryon", (data) => {
-    console.log("Try-on trigger received:", data);
-
-    if (!data.category) {
-        toggleWidgetsVisibility(false, false);
-        document.getElementById("product-options").innerHTML = `
-            <span style="color:white;">No matching items found.</span>
-        `;
-        setTimeout(() => {
-            document.getElementById("product-options").innerHTML = "";
-        }, 4000);
-        return;
-    }
-
-    socket.on("try_on_selected_item", ({ index }) => {
-        console.log("Selected item index:", index);
-
-        const item = currentTryOnItems[index];
-        if (item) {
-            toggleWidgetsVisibility(false, true); // Hide options, show preview
-            if (liveTryOn) {
-                liveTryOn.setOverlay(item.processed_image_url);
-            } else {
-                console.error("Live Try-On not initialized, but it should be.");
-            }
-        } else {
-            console.warn("No item found for selected index:", index);
-        }
-    });
-
-    const { category, color, max_price } = data;
-    showTryOnOptions(category, color, max_price);
-});
 
 class LiveTryOn {
     constructor() {
-        this.videoElement = document.getElementById("webcam");
-        this.canvasElement = document.getElementById("live-canvas");
-        this.canvasCtx = this.canvasElement.getContext("2d");
+        this.videoElement = document.getElementById('input_video');
+        this.canvasElement = document.getElementById('output_canvas');
+        this.canvasCtx = this.canvasElement.getContext('2d');
         this.overlayImage = new Image();
-        this.overlayImage.style.display = 'none'; // Keep it out of the DOM flow
-        this.timeoutId = null; 
-
         this.pose = new Pose({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
         });
@@ -524,113 +529,86 @@ class LiveTryOn {
             smoothLandmarks: true,
             enableSegmentation: false,
             minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5,
+            minTrackingConfidence: 0.5
         });
 
         this.pose.onResults(this.onPoseResults.bind(this));
 
         this.camera = new Camera(this.videoElement, {
             onFrame: async () => {
-                await this.pose.send({ image: this.videoElement });
+                await this.pose.send({
+                    image: this.videoElement
+                });
             },
             width: 640,
-            height: 480,
+            height: 480
         });
-
         this.camera.start();
         this.startCloseTimer();
         console.log("Live Try-On session started.");
     }
 
     startCloseTimer() {
-        if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-        }
-        this.timeoutId = setTimeout(() => {
+        this.closeTimer = setTimeout(() => {
             console.log("Auto-closing try-on session after 20 seconds of inactivity.");
-            toggleWidgetsVisibility(false, false);
-        }, 20000);
+            this.stop();
+            toggleWidgetsVisibility(false, false); // Return to default view
+        }, 20000); // 20 seconds
     }
 
     setOverlay(imageUrl) {
-        if (imageUrl) {
+        if(imageUrl) {
             this.overlayImage.src = imageUrl;
-            this.overlayImage.style.display = 'block';
-            this.startCloseTimer(); 
         } else {
-            this.overlayImage.src = '';
-            this.overlayImage.style.display = 'none';
+            console.warn("No overlay image URL provided.");
         }
     }
 
     onPoseResults(results) {
+        if (!results.poseLandmarks) {
+            return;
+        }
         this.canvasCtx.save();
         this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
         this.canvasCtx.drawImage(results.image, 0, 0, this.canvasElement.width, this.canvasElement.height);
-
-        if (results.poseLandmarks && this.overlayImage.src) {
-            this.drawOverlay(results.poseLandmarks);
+        
+        if (this.overlayImage.src) {
+           this.drawOverlay(results.poseLandmarks);
         }
 
         this.canvasCtx.restore();
     }
-
+    
     drawOverlay(landmarks) {
         const leftShoulder = landmarks[11];
         const rightShoulder = landmarks[12];
         const leftHip = landmarks[23];
         const rightHip = landmarks[24];
-
-        if (leftShoulder.visibility < 0.7 || rightShoulder.visibility < 0.7 ||
-            leftHip.visibility < 0.7 || rightHip.visibility < 0.7) {
-            return; // Not enough landmarks are visible
+    
+        if (leftShoulder && rightShoulder && leftHip && rightHip) {
+            const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x) * this.canvasElement.width;
+            const bodyHeight = Math.abs(leftHip.y - leftShoulder.y) * this.canvasElement.height;
+    
+            const centerX = (leftShoulder.x + rightShoulder.x) / 2 * this.canvasElement.width;
+            const centerY = (leftShoulder.y + rightShoulder.y) / 2 * this.canvasElement.height;
+    
+            const scaleRatio = 2.5; 
+            const scaledWidth = shoulderWidth * scaleRatio;
+            const aspectRatio = this.overlayImage.naturalHeight / this.overlayImage.naturalWidth;
+            const scaledHeight = scaledWidth * aspectRatio;
+    
+            const drawX = centerX - scaledWidth / 2;
+            const drawY = centerY - (scaledHeight * 0.1); 
+    
+            this.canvasCtx.drawImage(this.overlayImage, drawX, drawY, scaledWidth, scaledHeight);
         }
-
-        // --- All coordinates are in normalized screen space (0.0 - 1.0) ---
-        const canvasWidth = this.canvasElement.width;
-        const canvasHeight = this.canvasElement.height;
-
-        // Calculate torso center
-        const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
-        const hipCenterX = (leftHip.x + rightHip.x) / 2;
-        const torsoCenterY = (leftShoulder.y + rightHip.y) / 2;
-        
-        // Calculate width and height based on torso
-        const torsoWidth = Math.abs(leftShoulder.x - rightShoulder.x) * canvasWidth;
-        const torsoHeight = Math.abs(leftShoulder.y - leftHip.y) * canvasHeight;
-
-        // Add padding to make the clothing item look natural
-        const widthPadding = 1.8; // Adjust this factor as needed
-        const itemWidth = torsoWidth * widthPadding;
-        const itemHeight = torsoHeight * 1.1; // Slightly longer than torso
-
-        // Calculate rotation based on shoulder angle, and add PI to correct the inversion
-        const angle = Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x) + Math.PI;
-
-        // --- Drawing on Canvas ---
-        this.canvasCtx.save();
-        // Translate and rotate canvas to draw the image
-        this.canvasCtx.translate(shoulderCenterX * canvasWidth, torsoCenterY * canvasHeight);
-        this.canvasCtx.rotate(angle);
-
-        // Draw the image centered on the new, rotated origin
-        this.canvasCtx.drawImage(
-            this.overlayImage,
-            -itemWidth / 2,
-            -itemHeight / 2,
-            itemWidth,
-            itemHeight
-        );
-
-        this.canvasCtx.restore();
     }
+    
 
     stop() {
-        if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-        }
         this.camera.stop();
         this.pose.close();
+        clearTimeout(this.closeTimer);
         console.log("Live Try-On session stopped.");
     }
 }
